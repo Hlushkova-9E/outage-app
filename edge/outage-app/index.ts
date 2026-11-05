@@ -1,4 +1,4 @@
-// Supabase Edge Function «outage-app» (v4): віддає сторінці Mini App «📅 Графік» дані з бази.
+// Supabase Edge Function «outage-app» (v5): віддає сторінці Mini App «📅 Графік» дані з бази.
 // Перевірка підпису Telegram (initData) робиться в SQL-функціях outage_app_data (бот FamilyBot) і outage_house_data (будинковий бот), тут лише передача запиту.
 // Verify JWT: вимкнено (сторінка публічна, доступ дає підпис Telegram). Секрети не потрібні (ключ service_role Supabase підставляє сам).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -24,19 +24,21 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false }, 405);
   try {
     const body = await req.json();
+    // зсув у тижнях від поточного (SQL 37 обрізає до −8…+1)
+    const week = Number.isInteger(body?.week) && Math.abs(body.week) <= 52 ? body.week : 0;
     if (body?.public === "house") {
       // публічна версія для будинкового чату (без входу через Telegram): лише підписка дому, без розеток
-      const pr = await sb.rpc("outage_house_core");
+      const pr = await sb.rpc("outage_house_core", { p_week: week });
       if (pr.error) { console.error("outage_house_core", pr.error); return json({ ok: false }, 500); }
       return json(pr.data ?? { ok: false }, pr.data?.ok ? 200 : 500);
     }
     const { init_data } = body;
     if (typeof init_data !== "string" || !init_data || init_data.length > 4000) return json({ ok: false }, 400);
-    let { data, error } = await sb.rpc("outage_app_data", { p_init: init_data });
+    let { data, error } = await sb.rpc("outage_app_data", { p_init: init_data, p_week: week });
     if (error) { console.error("outage_app_data", error); return json({ ok: false }, 500); }
     if (!data?.ok) {
       // запуск із будинкового бота (підпис іншого токена): лише підписка дому, без розеток
-      const h = await sb.rpc("outage_house_data", { p_init: init_data });
+      const h = await sb.rpc("outage_house_data", { p_init: init_data, p_week: week });
       if (h.error) { console.error("outage_house_data", h.error); return json({ ok: false }, 500); }
       data = h.data;
     }
