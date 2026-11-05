@@ -182,8 +182,8 @@ function render() {
       + (isToday ? '<div class="nowline" style="left:' + (nowMin / 14.4) + '%"></div>' : "") + '</div></div>';
     fact.innerHTML = "<h3>Факт і план, світла немає</h3>"
       + bar("План", day.known ? day.plan : [], "var(--off)")
-      + bar("Розетки", day.sock, "var(--sock)")
-      + bar("Сусіди", day.sb, "var(--sb)")
+      + (DATA.house ? "" : bar("Розетки", day.sock, "var(--sock)"))
+      + bar("Svitlobot. Ввід 1", day.sb, "var(--sb)")
       + '<div class="ticks"><span></span><div><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>';
     fact.style.display = "block";
   } else fact.style.display = "none";
@@ -191,11 +191,11 @@ function render() {
   const lg = ['<span><i style="background:var(--card);border:1.5px solid var(--line)"></i>є світло</span>', '<span><i style="background:var(--off)"></i>немає світла</span>'];
   if ((day.pos || []).length) lg.push('<span><i style="background:var(--possible)"></i>можливо</span>');
   if (showEm) lg.push('<span><i style="background:var(--emerg)"></i>екстрені</span>');
-  if (sub.fact && day.date <= DATA.today) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>', '<span><i style="background:var(--sb)"></i>СвітлоБот (сусіди)</span>');
+  if (sub.fact && day.date <= DATA.today) { if (!DATA.house) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>'); lg.push('<span><i style="background:var(--sb)"></i>Svitlobot. Ввід 1</span>'); }
   $("legend").innerHTML = lg.join("");
   // підсумок
   $("m1").textContent = "Черга " + sub.grp + " · " + DAYS[dayIdx] + ", " + dm(day.date);
-  $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + (day.sock.length ? " · факт " + dur(sum(day.sock)) : "") : (day.emergency ? "🚨 поза графіком" : "очікується графік");
+  $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + ((DATA.house ? day.sb : day.sock).length ? " · факт " + dur(sum(DATA.house ? day.sb : day.sock)) : "") : (day.emergency ? "🚨 поза графіком" : "очікується графік");
 }
 
 async function load() {
