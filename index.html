@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Графік світла</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f5f7; --card: #ffffff; --line: #e4e6eb; --text: #1f2937; --muted: #6b7280;
+      --seg: #ecedf1; --off: #182538; --offtext: #ffffff; --possible: #f6e7c3;
+      --emerg: rgba(220, 38, 38, 0.32); --emergbg: #fef2f2; --emergline: #fecaca; --emergtext: #991b1b;
+      --cur: #0085ff; --sock: #e8a317; --sb: #2f80ed; --bolt: #f2b93b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11151c; --card: #1a2029; --line: #2a323f; --text: #e5e7eb; --muted: #9aa3b2;
+        --seg: #262d38; --off: #3a4a66; --offtext: #ffffff; --possible: #4a4126;
+        --emerg: rgba(248, 113, 113, 0.38); --emergbg: #3a1d1d; --emergline: #7f1d1d; --emergtext: #fecaca;
+        --cur: #4da3ff; --sock: #f0b83a; --sb: #6aa6f5; --bolt: #f2b93b;
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; padding: 12px; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+    .card { max-width: 460px; margin: 0 auto; background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 14px; }
+    .subs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; }
+    .sub { flex: none; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; }
+    .sub.active { background: var(--seg); font-weight: 600; }
+    .days { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--seg); border-radius: 999px; padding: 4px; margin-bottom: 12px; }
+    .day { border: 0; background: transparent; color: var(--text); padding: 7px 0; border-radius: 999px; font-size: 14.5px; }
+    .day.active { background: var(--card); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
+    .day.empty { color: var(--muted); }
+    .banner { display: none; gap: 10px; align-items: center; background: var(--emergbg); border: 1px solid var(--emergline); color: var(--emergtext); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; font-size: 13.5px; line-height: 1.35; }
+    .banner.show { display: flex; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+    .cell { position: relative; height: 46px; border-radius: 12px; border: 1.5px solid var(--line); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 14.5px; }
+    .half { position: absolute; top: 0; bottom: 0; width: 50%; }
+    .half.l { left: 0; } .half.r { right: 0; }
+    .half.off { background: var(--off); } .half.pos { background: var(--possible); }
+    .cell .t { position: relative; z-index: 1; display: inline-flex; gap: 5px; align-items: center; }
+    .cell.alloff .t { color: var(--offtext); }
+    .split { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
+    .split.l { clip-path: inset(0 50% 0 0); } .split.r { clip-path: inset(0 0 0 50%); }
+    .split.w { color: var(--offtext); }
+    .cell.current { box-shadow: 0 0 0 2px var(--card), 0 0 0 4.5px var(--cur); z-index: 2; }
+    .em { position: absolute; top: 0; bottom: 0; background: var(--emerg); z-index: 0; }
+    .empty-box { grid-column: 1 / -1; height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--muted); font-size: 15px; padding: 0 16px; }
+    .fact { border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 10px; }
+    .fact h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+    .bar { display: grid; grid-template-columns: 78px 1fr; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12.5px; color: var(--muted); }
+    .track { position: relative; height: 14px; border-radius: 7px; background: var(--seg); overflow: hidden; }
+    .seg { position: absolute; top: 0; bottom: 0; }
+    .nowline { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--cur); z-index: 3; }
+    .ticks { display: grid; grid-template-columns: 78px 1fr; gap: 8px; font-size: 11px; color: var(--muted); }
+    .ticks div { display: flex; justify-content: space-between; }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+    .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+    .meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="subs" class="subs"></div>
+    <div id="days" class="days"></div>
+    <div id="banner" class="banner"><span style="font-size:20px">🚨</span><div id="banner-text"></div></div>
+    <div id="grid" class="grid"></div>
+    <div id="fact" class="fact" style="display:none"></div>
+    <div id="legend" class="legend"></div>
+    <div class="meta"><span id="m1"></span><span id="m2"></span></div>
+  </div>
+
+<script>
+const API = "https://hikzqzdulvekuplolymw.supabase.co/functions/v1/outage-app";
+const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+let DATA = null, subIdx = 0, dayIdx = 0;
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, "0");
+const hhmm = (m) => pad(Math.floor(m / 60) % 24) + ":" + pad(m % 60);
+const dur = (m) => { const h = Math.floor(m / 60), x = m % 60; return (h ? h + " год" : "") + (h && x ? " " : "") + (x || !h ? x + " хв" : ""); };
+const sum = (a) => a.reduce((s, [x, y]) => s + (y - x), 0);
+const overlap = (a, x, y) => a.some(([s, e]) => Math.max(s, x) < Math.min(e, y));
+const dm = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7);
+const kyivMinutes = () => {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+  return parseInt(p.find(x => x.type === "hour").value, 10) % 24 * 60 + parseInt(p.find(x => x.type === "minute").value, 10);
+};
+
+function msg(icon, text) {
+  const box = document.createElement("div");
+  box.className = "empty-box";
+  const i = document.createElement("div"); i.style.fontSize = "30px"; i.textContent = icon;
+  const t = document.createElement("div"); t.textContent = text;
+  box.append(i, t);
+  $("grid").replaceChildren(box);
+  $("subs").innerHTML = ""; $("days").innerHTML = ""; $("fact").style.display = "none"; $("legend").innerHTML = "";
+  $("m1").textContent = ""; $("m2").textContent = ""; $("banner").className = "banner";
+}
+
+function boltOn() { return '<svg width="12" height="15" viewBox="0 0 16 20" fill="var(--bolt)"><path d="M9.5 1L2 11h6l-1.5 8L14 9H8l1.5-8z"/></svg>'; }
+function boltOff() { return '<svg width="13" height="15" viewBox="0 0 18 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L3 11h5.5L7 18l7.5-9H9l1-7z"/><line x1="2" y1="3" x2="16" y2="17"/></svg>'; }
+
+function render() {
+  if (!DATA) return;
+  const sub = DATA.subs[subIdx];
+  const day = sub.days[dayIdx];
+  const isToday = day.date === DATA.today;
+  const nowMin = kyivMinutes();
+
+  // підписки
+  $("subs").innerHTML = "";
+  if (DATA.subs.length > 1) {
+    DATA.subs.forEach((s, i) => {
+      const b = document.createElement("button");
+      b.className = "sub" + (i === subIdx ? " active" : "");
+      b.textContent = s.title.replace(/^[^\p{L}\p{N}]+/u, "");
+      b.onclick = () => { subIdx = i; render(); };
+      $("subs").appendChild(b);
+    });
+  }
+  // дні
+  $("days").innerHTML = "";
+  sub.days.forEach((d, i) => {
+    const b = document.createElement("button");
+    b.className = "day" + (i === dayIdx ? " active" : (!d.known && !d.emergency && !d.emerg.length ? " empty" : ""));
+    b.textContent = DAYS[i];
+    b.onclick = () => { dayIdx = i; render(); };
+    $("days").appendChild(b);
+  });
+  // банер екстрених
+  const em = day.emerg || [];
+  const showEm = day.emergency || em.length > 0;
+  $("banner").className = "banner" + (showEm ? " show" : "");
+  if (showEm) {
+    const ranges = em.map(([s, e], i) => hhmm(s) + "–" + (day.emergency && isToday && i === em.length - 1 ? "зараз" : hhmm(e % 1440 === 0 && e > 0 ? 1440 : e))).join(", ");
+    $("banner-text").innerHTML = day.emergency
+      ? "<b>Діють екстрені відключення</b>" + (ranges ? ": " + ranges : "") + ". Графік може не діяти."
+      : "<b>Цього дня були екстрені відключення:</b> " + ranges + ".";
+  }
+  // сітка
+  const grid = $("grid");
+  if (!day.known) {
+    grid.innerHTML = "";
+    const box = document.createElement("div");
+    box.className = "empty-box";
+    box.innerHTML = "<div style='font-size:30px'></div><div></div>";
+    box.children[0].textContent = day.emergency ? "🚨" : "⏳";
+    box.children[1].textContent = day.emergency ? "На " + DAYS[dayIdx] + ", " + dm(day.date) + " погодинного графіка немає" : "Графік на " + DAYS[dayIdx] + ", " + dm(day.date) + " ще не опубліковано";
+    grid.appendChild(box);
+  } else {
+    let html = "";
+    for (let h = 0; h < 24; h++) {
+      const a = day.plan, p = day.pos || [];
+      const o1 = overlap(a, h * 60, h * 60 + 30), o2 = overlap(a, h * 60 + 30, h * 60 + 60);
+      const p1 = !o1 && overlap(p, h * 60, h * 60 + 30), p2 = !o2 && overlap(p, h * 60 + 30, h * 60 + 60);
+      const cls = ["cell"];
+      if (o1 && o2) cls.push("alloff"); else if (o1 || o2) cls.push("mixed");
+      if (isToday && Math.floor(nowMin / 60) === h) cls.push("current");
+      const marks = em.filter(([s, e]) => Math.max(s, h * 60) < Math.min(e, h * 60 + 60))
+        .map(([s, e]) => '<div class="em" style="left:' + ((Math.max(s, h * 60) - h * 60) / 60 * 100) + '%;width:' + ((Math.min(e, h * 60 + 60) - Math.max(s, h * 60)) / 60 * 100) + '%"></div>').join("");
+      const icon = o1 && o2 ? boltOff() : (!o1 && !o2 ? boltOn() : "");
+      html += '<div class="' + cls.join(" ") + '">'
+        + '<div class="half l ' + (o1 ? "off" : p1 ? "pos" : "") + '"></div><div class="half r ' + (o2 ? "off" : p2 ? "pos" : "") + '"></div>'
+        + marks + (o1 !== o2
+          ? '<span class="split l' + (o1 ? ' w' : '') + '">' + pad(h) + ':00</span><span class="split r' + (o2 ? ' w' : '') + '">' + pad(h) + ':00</span>'
+          : '<span class="t">' + icon + pad(h) + ':00</span>') + '</div>';
+    }
+    grid.innerHTML = html;
+  }
+  // факт
+  const fact = $("fact");
+  if (sub.fact && day.date <= DATA.today && (day.known || day.sock.length || day.sb.length)) {
+    const bar = (label, arr, color) => '<div class="bar"><span>' + label + '</span><div class="track">'
+      + arr.map(([s, e]) => '<div class="seg" style="left:' + (s / 14.4) + '%;width:' + ((e - s) / 14.4) + '%;background:' + color + '"></div>').join("")
+      + (isToday ? '<div class="nowline" style="left:' + (nowMin / 14.4) + '%"></div>' : "") + '</div></div>';
+    fact.innerHTML = "<h3>Факт і план, світла немає</h3>"
+      + bar("План", day.known ? day.plan : [], "var(--off)")
+      + bar("Розетки", day.sock, "var(--sock)")
+      + bar("Сусіди", day.sb, "var(--sb)")
+      + '<div class="ticks"><span></span><div><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>';
+    fact.style.display = "block";
+  } else fact.style.display = "none";
+  // легенда
+  const lg = ['<span><i style="background:var(--card);border:1.5px solid var(--line)"></i>є світло</span>', '<span><i style="background:var(--off)"></i>немає світла</span>'];
+  if ((day.pos || []).length) lg.push('<span><i style="background:var(--possible)"></i>можливо</span>');
+  if (showEm) lg.push('<span><i style="background:var(--emerg)"></i>екстрені</span>');
+  if (sub.fact && day.date <= DATA.today) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>', '<span><i style="background:var(--sb)"></i>СвітлоБот (сусіди)</span>');
+  $("legend").innerHTML = lg.join("");
+  // підсумок
+  $("m1").textContent = "Черга " + sub.grp + " · " + DAYS[dayIdx] + ", " + dm(day.date);
+  $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + (day.sock.length ? " · факт " + dur(sum(day.sock)) : "") : (day.emergency ? "🚨 поза графіком" : "очікується графік");
+}
+
+async function load() {
+  if (!tg || !tg.initData) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
+  try {
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ init_data: tg.initData }) });
+    if (r.status === 401) { msg("🔒", "Не вдалося підтвердити вхід. Закрийте і відкрийте графік із бота ще раз."); return; }
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(r.status);
+    if (!d.subs.length) { msg("ℹ️", "Для вас ще немає підписок на графік."); return; }
+    DATA = d;
+    dayIdx = d.subs[0].days.findIndex((x) => x.date === d.today);
+    if (dayIdx < 0) dayIdx = 0;
+    render();
+  } catch (e) { msg("⚠️", "Не вдалося завантажити графік. Спробуйте відкрити ще раз."); }
+}
+load();
+</script>
+</body>
+</html>
