@@ -22,7 +22,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json({ ok: false }, 405);
   try {
-    const { init_data } = await req.json();
+    const body = await req.json();
+    if (body?.public === "house") {
+      // публічна версія для будинкового чату (без входу через Telegram): лише підписка дому, без розеток
+      const pr = await sb.rpc("outage_house_core");
+      if (pr.error) { console.error("outage_house_core", pr.error); return json({ ok: false }, 500); }
+      return json(pr.data ?? { ok: false }, pr.data?.ok ? 200 : 500);
+    }
+    const { init_data } = body;
     if (typeof init_data !== "string" || !init_data || init_data.length > 4000) return json({ ok: false }, 400);
     let { data, error } = await sb.rpc("outage_app_data", { p_init: init_data });
     if (error) { console.error("outage_app_data", error); return json({ ok: false }, 500); }

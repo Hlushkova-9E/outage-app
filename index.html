@@ -199,9 +199,10 @@ function render() {
 }
 
 async function load() {
-  if (!tg || !tg.initData) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
+  const pub = !(tg && tg.initData) && /[?&]house\b/.test(location.search);
+  if (!pub && (!tg || !tg.initData)) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
   try {
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ init_data: tg.initData }) });
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pub ? { public: "house" } : { init_data: tg.initData }) });
     if (r.status === 401) { msg("🔒", "Не вдалося підтвердити вхід. Закрийте і відкрийте графік із бота ще раз."); return; }
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(r.status);
