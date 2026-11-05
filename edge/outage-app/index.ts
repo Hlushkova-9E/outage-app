@@ -1,4 +1,4 @@
-// Supabase Edge Function «outage-app»: віддає сторінці Mini App «📅 Графік» дані з бази.
+// Supabase Edge Function «outage-app» (v4): віддає сторінці Mini App «📅 Графік» дані з бази.
 // Перевірка підпису Telegram (initData) робиться в SQL-функціях outage_app_data (бот FamilyBot) і outage_house_data (будинковий бот), тут лише передача запиту.
 // Verify JWT: вимкнено (сторінка публічна, доступ дає підпис Telegram). Секрети не потрібні (ключ service_role Supabase підставляє сам).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -7,18 +7,19 @@ const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SE
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const ORIGIN = "https://abohdanovskyi.github.io";
-const cors = {
-  "Access-Control-Allow-Origin": ORIGIN,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "content-type",
-  "Vary": "Origin",
-};
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+// дозволені адреси сторінки: нова (hlushkova-9e) і стара (abohdanovskyi), поки старі посилання ще живі
+const ORIGINS = ["https://hlushkova-9e.github.io", "https://abohdanovskyi.github.io"];
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin") ?? "";
+  const cors = {
+    "Access-Control-Allow-Origin": ORIGINS.includes(origin) ? origin : ORIGINS[0],
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "content-type",
+    "Vary": "Origin",
+  };
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json({ ok: false }, 405);
   try {

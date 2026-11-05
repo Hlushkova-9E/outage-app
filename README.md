@@ -2,9 +2,12 @@
 
 Telegram Mini App «📅 Графік» для бота відключень світла (сімейні домашні додатки).
 
-- `index.html` — вся сторінка (без збірки). Публікується через GitHub Pages з гілки `main`.
-- `edge/outage-app/index.ts` — Supabase Edge Function (Verify JWT вимкнено): передає initData у SQL-функцію `outage_app_data`.
+- `index.html` — вся сторінка (без збірки). Публікується через GitHub Pages з гілки `main`: https://hlushkova-9e.github.io/outage-app/ (будинкова версія: `?house=1`).
+- `apple-touch-icon.png` — іконка 180×180 для «На початковий екран» в iOS (назва «Графік 9Є»).
+- `edge/outage-app/index.ts` — Supabase Edge Function v4 (Verify JWT вимкнено; дозволені адреси hlushkova-9e.github.io і abohdanovskyi.github.io): передає initData у SQL-функцію `outage_app_data`.
 - `sql/32-supabase-outage-app.sql` — таблиця періодів екстрених, перевірка підпису Telegram, дані для сторінки, кнопка в боті.
+- `sql/33`–`sql/35` — будинковий бот, «зелені» години, публічна версія `?house=1`.
+- `sql/36-supabase-outage-newurl.sql` — нова адреса сторінки (app_url і кнопка «🌐 У браузері»).
 
 У репозиторії публічний лише код: адрес, ключів і даних тут немає. Дані сторінка бере з Supabase після перевірки підпису Telegram і бачить лише власні підписки.
-Робота ведеться в гілці `dev`; у `main` зливаємо лише після слова «публікуй».
+Робота ведеться в гілці `dev`; у `main` зливаємо лише після слова «публікую».
