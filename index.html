@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Графік світла</title>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Графік 9Є">
+  <script>if (/[?&]house\b/.test(location.search)) document.title = "Графік відключень. Глушкова, 9Є";</script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -31,6 +34,10 @@
     .subs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; }
     .sub { flex: none; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; }
     .sub.active { background: var(--seg); font-weight: 600; }
+    .weeks { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .wbtn { flex: none; width: 40px; height: 34px; border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 999px; font-size: 14px; }
+    .wbtn:disabled { opacity: .35; }
+    .wlabel { font-size: 14.5px; font-weight: 600; text-align: center; }
     .days { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--seg); border-radius: 999px; padding: 4px; margin-bottom: 12px; }
     .day { border: 0; background: transparent; color: var(--text); padding: 7px 0; border-radius: 999px; font-size: 14.5px; }
     .day.active { background: var(--card); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
@@ -66,6 +73,11 @@
 <body>
   <div class="card">
     <div id="subs" class="subs"></div>
+    <div id="weeks" class="weeks" style="display:none">
+      <button id="wprev" class="wbtn" aria-label="Попередній тиждень">◀</button>
+      <span id="wlabel" class="wlabel"></span>
+      <button id="wnext" class="wbtn" aria-label="Наступний тиждень">▶</button>
+    </div>
     <div id="days" class="days"></div>
     <div id="banner" class="banner"><span style="font-size:20px">🚨</span><div id="banner-text"></div></div>
     <div id="grid" class="grid"></div>
@@ -80,7 +92,7 @@ const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-let DATA = null, subIdx = 0, dayIdx = 0;
+let DATA = null, subIdx = 0, dayIdx = 0, WEEK = 0, busy = false;
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
 const hhmm = (m) => pad(Math.floor(m / 60) % 24) + ":" + pad(m % 60);
@@ -100,7 +112,7 @@ function msg(icon, text) {
   const t = document.createElement("div"); t.textContent = text;
   box.append(i, t);
   $("grid").replaceChildren(box);
-  $("subs").innerHTML = ""; $("days").innerHTML = ""; $("fact").style.display = "none"; $("legend").innerHTML = "";
+  $("subs").innerHTML = ""; $("days").innerHTML = ""; $("weeks").style.display = "none"; $("fact").style.display = "none"; $("legend").innerHTML = "";
   $("m1").textContent = ""; $("m2").textContent = ""; $("banner").className = "banner";
 }
 
@@ -125,11 +137,17 @@ function render() {
       $("subs").appendChild(b);
     });
   }
+  // тиждень
+  $("weeks").style.display = "flex";
+  $("wlabel").textContent = "Тиждень " + dm(sub.days[0].date) + "–" + dm(sub.days[6].date);
+  const hasW = typeof DATA.week === "number";
+  $("wprev").disabled = busy || !hasW || DATA.week <= DATA.week_min;
+  $("wnext").disabled = busy || !hasW || DATA.week >= DATA.week_max;
   // дні
   $("days").innerHTML = "";
   sub.days.forEach((d, i) => {
     const b = document.createElement("button");
-    b.className = "day" + (i === dayIdx ? " active" : (!d.known && !d.emergency && !d.emerg.length ? " empty" : ""));
+    b.className = "day" + (i === dayIdx ? " active" : (d.nodata || (!d.known && !d.emergency && !d.emerg.length) ? " empty" : ""));
     b.textContent = DAYS[i];
     b.onclick = () => { dayIdx = i; render(); };
     $("days").appendChild(b);
@@ -151,8 +169,11 @@ function render() {
     const box = document.createElement("div");
     box.className = "empty-box";
     box.innerHTML = "<div style='font-size:30px'></div><div></div>";
-    box.children[0].textContent = day.emergency ? "🚨" : "⏳";
-    box.children[1].textContent = day.emergency ? "На " + DAYS[dayIdx] + ", " + dm(day.date) + " погодинного графіка немає" : "Графік на " + DAYS[dayIdx] + ", " + dm(day.date) + " ще не опубліковано";
+    const when = DAYS[dayIdx] + ", " + dm(day.date);
+    box.children[0].textContent = day.emergency ? "🚨" : day.nodata ? "🗂" : day.date < DATA.today ? "—" : "⏳";
+    box.children[1].textContent = day.emergency ? "На " + when + " погодинного графіка немає"
+      : day.nodata ? "Даних за " + when + " немає: історія ведеться від 01.11.2026"
+      : day.date < DATA.today ? "Графіка на " + when + " немає" : "Графік на " + when + " ще не опубліковано";
     grid.appendChild(box);
   } else {
     let html = "";
@@ -191,29 +212,46 @@ function render() {
   const lg = ['<span><i style="background:var(--card);border:1.5px solid var(--line)"></i>є світло</span>', '<span><i style="background:var(--off)"></i>немає світла</span>'];
   if ((day.pos || []).length) lg.push('<span><i style="background:var(--possible)"></i>можливо</span>');
   if (showEm) lg.push('<span><i style="background:var(--emerg)"></i>екстрені</span>');
-  if (sub.fact && day.date <= DATA.today) { if (!DATA.house) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>'); lg.push('<span><i style="background:var(--sb)"></i>Svitlobot. Ввід 1</span>'); }
+  if (sub.fact && day.date <= DATA.today && !day.nodata) { if (!DATA.house) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>'); lg.push('<span><i style="background:var(--sb)"></i>Svitlobot. Ввід 1</span>'); }
   $("legend").innerHTML = lg.join("");
   // підсумок
   $("m1").textContent = "Черга " + sub.grp + " · " + DAYS[dayIdx] + ", " + dm(day.date);
-  $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + ((DATA.house ? day.sb : day.sock).length ? " · факт " + dur(sum(DATA.house ? day.sb : day.sock)) : "") : (day.emergency ? "🚨 поза графіком" : "очікується графік");
+  $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + ((DATA.house ? day.sb : day.sock).length ? " · факт " + dur(sum(DATA.house ? day.sb : day.sock)) : "") : (day.emergency ? "🚨 поза графіком" : day.nodata ? "немає даних" : day.date < DATA.today ? "графіка не було" : "очікується графік");
 }
 
-async function load() {
+function pickDay(d, keepDay) {
+  const t = d.subs[0].days.findIndex((x) => x.date === d.today);
+  if (t >= 0) return t;
+  return keepDay ? dayIdx : 0;
+}
+
+async function load(week) {
   const pub = !(tg && tg.initData) && /[?&]house\b/.test(location.search);
   if (!pub && (!tg || !tg.initData)) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
+  const first = DATA === null;
+  busy = true; if (!first) render();
   try {
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pub ? { public: "house" } : { init_data: tg.initData }) });
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pub ? { public: "house", week } : { init_data: tg.initData, week }) });
     if (r.status === 401) { msg("🔒", "Не вдалося підтвердити вхід. Закрийте і відкрийте графік із бота ще раз."); return; }
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(r.status);
     if (!d.subs.length) { msg("ℹ️", "Для вас ще немає підписок на графік."); return; }
+    const key = DATA && DATA.subs[subIdx] ? DATA.subs[subIdx].key : null;
     DATA = d;
-    dayIdx = d.subs[0].days.findIndex((x) => x.date === d.today);
-    if (dayIdx < 0) dayIdx = 0;
+    WEEK = typeof d.week === "number" ? d.week : 0;
+    subIdx = Math.max(0, d.subs.findIndex((x) => x.key === key));
+    dayIdx = pickDay(d, !first);
+    busy = false;
     render();
-  } catch (e) { msg("⚠️", "Не вдалося завантажити графік. Спробуйте відкрити ще раз."); }
+  } catch (e) {
+    busy = false;
+    if (first) msg("⚠️", "Не вдалося завантажити графік. Спробуйте відкрити ще раз.");
+    else { render(); $("wlabel").textContent = "Не вдалося завантажити"; }
+  } finally { busy = false; }
 }
-load();
+$("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
+$("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
+load(0);
 </script>
 </body>
 </html>
