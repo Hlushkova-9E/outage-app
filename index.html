@@ -68,7 +68,8 @@
     .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
     .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
     .meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
-  </style>
+  .fund{max-width:460px;margin:12px auto 0}.fundbox{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px}.fundh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px;font-weight:700}.fx{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 8px}.fundp{font-size:14px;line-height:1.45;margin:10px 0 8px}.funds{font-size:13.5px;line-height:1.55}.fundt{display:flex;gap:8px;margin:12px 0}.fundt div{flex:1;background:var(--seg);border-radius:12px;padding:8px;font-size:12px;color:var(--muted)}.fundt b{display:block;font-size:15px;color:var(--text);margin-top:2px}.fundn{font-size:12.5px;color:var(--muted);margin-bottom:10px}.fundr{background:var(--seg);border-radius:12px;padding:10px;font-size:13px;line-height:1.5}.fundr small{display:block;color:var(--muted);font-size:12px}.fundi{display:flex;gap:6px;align-items:center;margin:6px 0}.fundi code{flex:1;font-size:12px;background:var(--card);border-radius:8px;padding:6px;word-break:break-all;user-select:text;-webkit-user-select:text}.fbtn{border:0;border-radius:12px;padding:11px;font-size:14px;background:var(--off);color:var(--offtext)}.fbtn.sm{border-radius:8px;padding:6px 8px;font-size:12px}.fbtn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.fundb{display:flex;gap:8px;margin-top:12px}.fundb .fbtn{flex:1}.fundstrip{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--text);text-align:left}
+</style>
 </head>
 <body>
   <div class="card">
@@ -85,6 +86,8 @@
     <div id="legend" class="legend"></div>
     <div class="meta"><span id="m1"></span><span id="m2"></span></div>
   </div>
+
+<div id="fund" class="fund"></div>
 
 <script>
 const API = "https://hikzqzdulvekuplolymw.supabase.co/functions/v1/outage-app";
@@ -251,6 +254,50 @@ async function load(week) {
 }
 $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
+(function(){
+ var fundOpen=null, KEY="fund_hide_";
+ function hid(f){try{var t=+localStorage.getItem(KEY+(f.v||1));return !!t&&Date.now()-t<172800000;}catch(e){return false;}}
+ function el(tag,cls,txt){var n=document.createElement(tag);if(cls)n.className=cls;if(txt!=null)n.textContent=txt;return n;}
+ function openUrl(u){if(tg&&tg.openTelegramLink&&/^https:\/\/t\.me\//.test(u)){tg.openTelegramLink(u);}else{window.open(u,"_blank","noopener");}}
+ function copy(txt,btn){
+  var done=function(){var o=btn.textContent;btn.textContent="Скопійовано ✓";setTimeout(function(){btn.textContent=o;},1500);};
+  var fb=function(){try{var a=document.createElement("textarea");a.value=txt;a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();document.execCommand("copy");document.body.removeChild(a);done();}catch(e){}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fb);}else{fb();}
+ }
+ function renderFund(){
+  var box=$("fund"); if(!box) return;
+  var f=DATA&&DATA.fundraise;
+  box.replaceChildren();
+  if(!f) return;
+  if(fundOpen===null) fundOpen=!hid(f);
+  if(!fundOpen){
+   var s=el("button","fundstrip"); s.type="button";
+   var l=el("span"); l.append("🚧 ",el("b",null,f.strip||f.title)," · долучитися до збору");
+   s.append(l,el("span",null,"▾"));
+   s.onclick=function(){fundOpen=true;renderFund();};
+   box.appendChild(s); return;
+  }
+  var close=function(){try{localStorage.setItem(KEY+(f.v||1),String(Date.now()));}catch(e){} fundOpen=false;renderFund();};
+  var c=el("div","fundbox");
+  var h=el("div","fundh"); h.appendChild(el("span",null,"🚧 "+f.title));
+  var x=el("button","fx","✕"); x.type="button"; x.setAttribute("aria-label","Закрити"); x.onclick=close; h.appendChild(x); c.appendChild(h);
+  c.appendChild(el("p","fundp",f.lead));
+  if(f.points&&f.points.length){var pts=el("div","funds"); f.points.forEach(function(p,i){pts.appendChild(el("div",null,(i>0&&i===f.points.length-1?"⏳ ":"✅ ")+p));}); c.appendChild(pts);}
+  if(f.cost||f.rec){var t=el("div","fundt"); if(f.cost){var a=el("div",null,"Орієнтовна вартість"); a.appendChild(el("b",null,f.cost)); t.appendChild(a);} if(f.rec){var b=el("div",null,"Рекомендований внесок"); b.appendChild(el("b",null,f.rec)); t.appendChild(b);} c.appendChild(t);}
+  if(f.note) c.appendChild(el("div","fundn",f.note));
+  var r=el("div","fundr"); r.appendChild(el("b",null,"💳 Як долучитися"));
+  r.appendChild(el("div",null,"Переказ на рахунок ОСББ. У призначенні вкажіть номер своєї квартири."));
+  r.appendChild(el("small",null,[f.payee,f.code?"код "+f.code:"",f.bank].filter(Boolean).join(" · ")));
+  if(f.iban){var row=el("div","fundi"); row.appendChild(el("code",null,f.iban)); var cb=el("button","fbtn sm","Копіювати"); cb.type="button"; cb.onclick=function(){copy(f.iban,cb);}; row.appendChild(cb); r.appendChild(row);}
+  if(f.purpose) r.appendChild(el("small",null,"Призначення: "+f.purpose));
+  c.appendChild(r);
+  var bt=el("div","fundb");
+  if(f.url&&/^https:\/\/t\.me\//.test(f.url)){var ob=el("button","fbtn","📄 Повний опис і розрахунок"); ob.type="button"; ob.onclick=function(){openUrl(f.url);}; bt.appendChild(ob);}
+  var cl=el("button","fbtn ghost","Закрити"); cl.type="button"; cl.onclick=close; bt.appendChild(cl);
+  c.appendChild(bt); box.appendChild(c);
+ }
+ var r0=render; render=function(){r0();renderFund();};
+})();
 load(0);
 </script>
 </body>
