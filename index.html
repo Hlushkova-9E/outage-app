@@ -68,7 +68,8 @@
     .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
     .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
     .meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
-  .fund{max-width:460px;margin:12px auto 0}.fundbox{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px}.fundh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px;font-weight:700}.fx{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 8px}.fundp{font-size:14px;line-height:1.45;margin:10px 0 8px}.funds{font-size:13.5px;line-height:1.55}.fundt{display:flex;gap:8px;margin:12px 0}.fundt div{flex:1;background:var(--seg);border-radius:12px;padding:8px;font-size:12px;color:var(--muted)}.fundt b{display:block;font-size:15px;color:var(--text);margin-top:2px}.fundn{font-size:12.5px;color:var(--muted);margin-bottom:10px}.fundr{background:var(--seg);border-radius:12px;padding:10px;font-size:13px;line-height:1.5}.fundr small{display:block;color:var(--muted);font-size:12px}.fundi{display:flex;gap:6px;align-items:center;margin:6px 0}.fundi code{flex:1;font-size:12px;background:var(--card);border-radius:8px;padding:6px;word-break:break-all;user-select:text;-webkit-user-select:text}.fbtn{border:0;border-radius:12px;padding:11px;font-size:14px;background:var(--off);color:var(--offtext)}.fbtn.sm{border-radius:8px;padding:6px 8px;font-size:12px}.fbtn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.fundb{display:flex;gap:8px;margin-top:12px}.fundb .fbtn{flex:1}.fundstrip{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--text);text-align:left}
+  .nowb{display:none;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.35;border:1px solid var(--line);background:var(--card)}.nowb.show{display:block}.nowb b{display:block;font-size:17px;margin-bottom:2px}.nowb.on{border-color:var(--bolt)}.nowb.offc{background:var(--off);border-color:var(--off);color:var(--offtext)}
+.fund{max-width:460px;margin:12px auto 0}.fundbox{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px}.fundh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px;font-weight:700}.fx{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 8px}.fundp{font-size:14px;line-height:1.45;margin:10px 0 8px}.funds{font-size:13.5px;line-height:1.55}.fundt{display:flex;gap:8px;margin:12px 0}.fundt div{flex:1;background:var(--seg);border-radius:12px;padding:8px;font-size:12px;color:var(--muted)}.fundt b{display:block;font-size:15px;color:var(--text);margin-top:2px}.fundn{font-size:12.5px;color:var(--muted);margin-bottom:10px}.fundr{background:var(--seg);border-radius:12px;padding:10px;font-size:13px;line-height:1.5}.fundr small{display:block;color:var(--muted);font-size:12px}.fundi{display:flex;gap:6px;align-items:center;margin:6px 0}.fundi code{flex:1;font-size:12px;background:var(--card);border-radius:8px;padding:6px;word-break:break-all;user-select:text;-webkit-user-select:text}.fbtn{border:0;border-radius:12px;padding:11px;font-size:14px;background:var(--off);color:var(--offtext)}.fbtn.sm{border-radius:8px;padding:6px 8px;font-size:12px}.fbtn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.fundb{display:flex;gap:8px;margin-top:12px}.fundb .fbtn{flex:1}.fundstrip{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--text);text-align:left}
 </style>
 </head>
 <body>
@@ -81,7 +82,8 @@
     </div>
     <div id="days" class="days"></div>
     <div id="banner" class="banner"><span style="font-size:20px">🚨</span><div id="banner-text"></div></div>
-    <div id="grid" class="grid"></div>
+    <div id="nowb" class="nowb"></div>
+<div id="grid" class="grid"></div>
     <div id="fact" class="fact" style="display:none"></div>
     <div id="legend" class="legend"></div>
     <div class="meta"><span id="m1"></span><span id="m2"></span></div>
@@ -103,8 +105,8 @@ const dur = (m) => { const h = Math.floor(m / 60), x = m % 60; return (h ? h + "
 const sum = (a) => a.reduce((s, [x, y]) => s + (y - x), 0);
 const overlap = (a, x, y) => a.some(([s, e]) => Math.max(s, x) < Math.min(e, y));
 const dm = (iso) => iso.slice(8, 10) + "." + iso.slice(5, 7);
-const kyivMinutes = () => {
-  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date());
+const kyivMinutes = (t) => {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(t || Date.now()));
   return parseInt(p.find(x => x.type === "hour").value, 10) % 24 * 60 + parseInt(p.find(x => x.type === "minute").value, 10);
 };
 
@@ -165,7 +167,29 @@ function render() {
       ? "<b>Діють екстрені відключення</b>" + (ranges ? ": " + ranges : "") + ". Графік може не діяти."
       : "<b>Цього дня були екстрені відключення:</b> " + ranges + ".";
   }
-  // сітка
+  // стан зараз (лише будинкова версія, лише для сьогодні)
+const nb = $("nowb");
+nb.className = "nowb";
+nb.replaceChildren();
+if (DATA.house && isToday) {
+const fm = kyivMinutes(DATA.now);
+const sbOff = (day.sb || []).some(([s, e]) => s <= fm && e >= fm - 1);
+const planKnown = day.known && !day.emergency;
+const planOff = planKnown && overlap(day.plan, fm, fm + 1);
+const on = !sbOff;
+let sub2;
+if (day.emergency) sub2 = "Svitlobot (Ввід 1): " + (sbOff ? "вимкнено" : "є") + " · діють екстрені відключення";
+else if (!planKnown) sub2 = "за Svitlobot (Ввід 1)";
+else if (!planOff && !sbOff) sub2 = "за графіком і за Svitlobot (Ввід 1)";
+else if (!planOff && sbOff) sub2 = "Svitlobot (Ввід 1): вимкнено · за графіком мало б бути";
+else if (planOff && sbOff) sub2 = "за графіком і за Svitlobot (Ввід 1)";
+else sub2 = "Svitlobot (Ввід 1): є · за графіком мало б не бути";
+const b = document.createElement("b"); b.textContent = (on ? "💡 Світло є" : "🌑 Світла немає");
+const d2 = document.createElement("div"); d2.textContent = sub2;
+nb.append(b, d2);
+nb.className = "nowb show " + (on ? "on" : "offc");
+}
+// сітка
   const grid = $("grid");
   if (!day.known) {
     grid.innerHTML = "";
@@ -204,7 +228,7 @@ function render() {
     const bar = (label, arr, color) => '<div class="bar"><span>' + label + '</span><div class="track">'
       + arr.map(([s, e]) => '<div class="seg" style="left:' + (s / 14.4) + '%;width:' + ((e - s) / 14.4) + '%;background:' + color + '"></div>').join("")
       + (isToday ? '<div class="nowline" style="left:' + (nowMin / 14.4) + '%"></div>' : "") + '</div></div>';
-    fact.innerHTML = "<h3>Факт і план, світла немає</h3>"
+    fact.innerHTML = "<h3>План і факт за день</h3>"
       + bar("План", day.known ? day.plan : [], "var(--off)")
       + (DATA.house ? "" : bar("Розетки", day.sock, "var(--sock)"))
       + bar("Svitlobot. Ввід 1", day.sb, "var(--sb)")
