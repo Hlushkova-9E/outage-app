@@ -70,6 +70,7 @@
     .meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
   .nowb{display:none;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.35;border:1px solid var(--line);background:var(--card)}.nowb.show{display:block}.nowb b{display:block;font-size:17px;margin-bottom:2px}.nowb.on{border-color:var(--bolt)}.nowb.offc{background:var(--off);border-color:var(--off);color:var(--offtext)}.nowx{margin-top:4px;font-size:12.5px;opacity:.9}
 .fund{max-width:460px;margin:12px auto 0}.fundbox{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px}.fundh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px;font-weight:700}.fx{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 8px}.fundp{font-size:14px;line-height:1.45;margin:10px 0 8px}.funds{font-size:13.5px;line-height:1.55}.fundt{display:flex;gap:8px;margin:12px 0}.fundt div{flex:1;background:var(--seg);border-radius:12px;padding:8px;font-size:12px;color:var(--muted)}.fundt b{display:block;font-size:15px;color:var(--text);margin-top:2px}.fundn{font-size:12.5px;color:var(--muted);margin-bottom:10px}.fundr{background:var(--seg);border-radius:12px;padding:10px;font-size:13px;line-height:1.5}.fundr small{display:block;color:var(--muted);font-size:12px}.fundi{display:flex;gap:6px;align-items:center;margin:6px 0}.fundi code{flex:1;font-size:12px;background:var(--card);border-radius:8px;padding:6px;word-break:break-all;user-select:text;-webkit-user-select:text}.fbtn{border:0;border-radius:12px;padding:11px;font-size:14px;background:var(--off);color:var(--offtext)}.fbtn.sm{border-radius:8px;padding:6px 8px;font-size:12px}.fbtn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.fundb{display:flex;gap:8px;margin-top:12px}.fundb .fbtn{flex:1}.fundstrip{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--text);text-align:left}
+.blb{display:none;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.35;border:1px solid var(--line);background:var(--card)}.blb.show{display:block}.blb b{display:block;font-size:15px;margin-bottom:2px}.track.blt{height:30px;border-radius:8px}.blt svg{position:absolute;left:0;top:0;width:100%;height:100%}:root{--blt:#22a861}
 </style>
 </head>
 <body>
@@ -83,6 +84,7 @@
     <div id="days" class="days"></div>
     <div id="banner" class="banner"><span style="font-size:20px">🚨</span><div id="banner-text"></div></div>
     <div id="nowb" class="nowb"></div>
+    <div id="blb" class="blb"></div>
 <div id="grid" class="grid"></div>
     <div id="fact" class="fact" style="display:none"></div>
     <div id="legend" class="legend"></div>
@@ -207,6 +209,25 @@ if (nxt) { const d3 = document.createElement("div"); d3.className = "nowx"; d3.t
 if (DATA.sb_ok && DATA.now - DATA.sb_ok > 15 * 60000) { const d4 = document.createElement("div"); d4.className = "nowx"; d4.textContent = "⚠️ Svitlobot не перевірявся " + dur(Math.round((DATA.now - DATA.sb_ok) / 60000)) + ", стан може бути неточним"; nb.append(d4); }
 nb.className = "nowb show " + (on ? "on" : "offc");
 }
+// Bluetti (лише версія FamilyBot для Антона й Ксенії, підписка дому, сьогодні)
+const bb = $("blb");
+bb.className = "blb";
+bb.replaceChildren();
+const BL = DATA.bl;
+if (BL && sub.fact && isToday) {
+  const age = Math.max(0, Math.round((DATA.now - (BL.at || 0)) / 60000));
+  let t1;
+  if (!BL.fresh) t1 = "🔋 Bluetti: дані недоступні (" + dur(age) + " тому)" + (BL.last_soc != null ? " · останній заряд " + BL.last_soc + "%" : "");
+  else if (!BL.online) t1 = "🔋 Bluetti вимкнено" + (BL.last_soc != null ? " · останній заряд " + BL.last_soc + "%" : "");
+  else if (BL.src === "bluetti") t1 = "🔋 Bluetti " + BL.soc + "% · живить квартиру · " + (BL.acw || 0) + " Вт";
+  else if ((BL.grid || 0) > 5) t1 = "🔋 Bluetti " + BL.soc + "% · заряджається (" + BL.grid + " Вт)";
+  else t1 = "🔋 Bluetti " + BL.soc + "% · увімкнено, не заряджається";
+  const b1 = document.createElement("b"); b1.textContent = t1; bb.append(b1);
+  if (BL.eta) BL.eta.replace(/^\s*·\s*/, "").split("\n").filter(Boolean).forEach((t) => { const x = document.createElement("div"); x.className = "nowx"; x.textContent = t.charAt(0).toUpperCase() + t.slice(1); bb.append(x); });
+  if (BL.fresh) { const x = document.createElement("div"); x.className = "nowx"; x.textContent = "оновлено " + (age < 1 ? "щойно" : dur(age) + " тому"); x.style.opacity = ".6"; bb.append(x); }
+  bb.className = "blb show";
+}
+const bpts = BL && sub.fact && BL.days ? (BL.days[day.date] || []) : [];
 // сітка
   const grid = $("grid");
   if (!day.known) {
@@ -250,6 +271,7 @@ nb.className = "nowb show " + (on ? "on" : "offc");
       + bar("План", day.known ? day.plan : [], "var(--off)")
       + (DATA.house ? "" : bar("Розетки", day.sock, "var(--sock)"))
       + bar("Svitlobot. Ввід 1", day.sb, "var(--sb)")
+      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null) : "")
       + '<div class="ticks"><span></span><div><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>';
     fact.style.display = "block";
   } else fact.style.display = "none";
@@ -258,10 +280,27 @@ nb.className = "nowb show " + (on ? "on" : "offc");
   if ((day.pos || []).length) lg.push('<span><i style="background:var(--possible)"></i>можливо</span>');
   if (showEm) lg.push('<span><i style="background:var(--emerg)"></i>екстрені</span>');
   if (sub.fact && day.date <= DATA.today && !day.nodata) { if (!DATA.house) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>'); lg.push('<span><i style="background:var(--sb)"></i>Svitlobot. Ввід 1</span>'); }
+  if (bpts.length && $("fact").style.display !== "none") lg.push('<span><i style="background:var(--blt)"></i>Bluetti: лінія — заряд, заливка — живив квартиру</span>');
   $("legend").innerHTML = lg.join("");
   // підсумок
   $("m1").textContent = "Черга " + sub.grp + " · " + DAYS[dayIdx] + ", " + dm(day.date);
   $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + ((DATA.house ? day.sb : day.sock).length ? " · факт " + dur(sum(DATA.house ? day.sb : day.sock)) : "") : (day.emergency ? "🚨 поза графіком" : day.nodata ? "немає даних" : day.date < DATA.today ? "графіка не було" : "очікується графік");
+}
+
+function bltBar(pts, nowM) {
+  let shade = "", lines = [], cur = [], prev = null;
+  pts.forEach(([m, soc, ac]) => {
+    if (ac) shade += '<rect x="' + m + '" y="0" width="10" height="100" fill="var(--blt)" opacity=".22"/>';
+    if (prev !== null && m - prev > 20) { if (cur.length) lines.push(cur); cur = []; }
+    cur.push((m + 5) + "," + (100 - Math.max(0, Math.min(100, soc)) * 0.92 - 4));
+    prev = m;
+  });
+  if (cur.length) lines.push(cur);
+  const pl = lines.map((c) => c.length === 1 ? '<circle cx="' + c[0].split(",")[0] + '" cy="' + c[0].split(",")[1] + '" r="6" fill="var(--blt)"/>'
+    : '<polyline points="' + c.join(" ") + '" fill="none" stroke="var(--blt)" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>').join("");
+  const last = pts[pts.length - 1];
+  return '<div class="bar"><span>Bluetti ' + last[1] + '%</span><div class="track blt"><svg viewBox="0 0 1440 100" preserveAspectRatio="none">' + shade + pl + '</svg>'
+    + (nowM !== null ? '<div class="nowline" style="left:' + (nowM / 14.4) + '%"></div>' : "") + '</div></div>';
 }
 
 function pickDay(d, keepDay) {
@@ -302,9 +341,26 @@ async function load(week, quiet) {
 $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
-function refresh() { if (document.visibilityState === "visible" && DATA && !busy) load(WEEK, true); }
+// нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
+const VER = "2026-11-07.3";
+let verAt = Date.now();
+async function checkVer() {
+  if (Date.now() - verAt < 600000) return;
+  verAt = Date.now();
+  try {
+    const r = await fetch(location.pathname + "?nv=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) return;
+    const m = (await r.text()).match(/const VER = "([^"]+)"/);
+    if (m && m[1] !== VER) {
+      let done = false;
+      try { done = sessionStorage.getItem("rl_" + m[1]) === "1"; sessionStorage.setItem("rl_" + m[1], "1"); } catch (e) {}
+      if (!done) location.reload();
+    }
+  } catch (e) {}
+}
+function refresh() { if (document.visibilityState === "visible" && DATA && !busy) { load(WEEK, true); checkVer(); } }
 setInterval(refresh, 120000);
-const onBack = () => { if (document.visibilityState === "visible" && Date.now() - lastLoad > 30000) refresh(); };
+const onBack = () => { if (document.visibilityState !== "visible") return; if (Date.now() - lastLoad > 30000) refresh(); else checkVer(); };
 document.addEventListener("visibilitychange", onBack);
 window.addEventListener("focus", onBack);
 if (tg && tg.onEvent) { try { tg.onEvent("activated", onBack); } catch (e) {} }
