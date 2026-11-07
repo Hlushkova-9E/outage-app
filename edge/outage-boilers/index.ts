@@ -1,4 +1,4 @@
-// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick).
+// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці.
 // Захист: заголовок X-Telegram-Bot-Api-Secret-Token має збігатися з tg_settings.secret.
 // Логіка Tuya скопійована з telegram-bot (runBoilers), бюджетний бот не змінюється.
 // Якщо жодна розетка не ввімкнулась через offline, цикл не вважається обробленим (boil_cycle = '', пауза 10 хв).
@@ -55,6 +55,7 @@ async function run(token: string, silent: boolean) {
   const ids = (ppl ?? []).map((r: { chat_id: string }) => r.chat_id);
   const say = (text: string) => Promise.all(ids.map((c) => tg(token, { chat_id: c, text, disable_notification: silent })));
   let okCount = 0, offlineCount = 0;
+  const turned: string[] = [], already: string[] = []; // v3: один підсумок замість «✅» по кожній розетці
   try {
     const { data: cfg } = await sb.from("tuya_settings").select("*").eq("id", 1).maybeSingle();
     const c = cfg as TuyaCfg | null;
@@ -73,12 +74,12 @@ async function run(token: string, silent: boolean) {
       if (!d) { await say(`⚠️ Не знайдено розетку «${name}» у Smart Life.`); continue; }
       const code = switchCode(d);
       try {
-        let already = false;
+        let wasOn = false;
         try {
           const st0 = (await tuyaCall(c, "GET", `/v1.0/devices/${d.id}/status`, undefined, tk)) as { code: string; value: unknown }[];
-          already = (st0 ?? []).find((x) => x.code === code)?.value === true;
-        } catch (_) { already = false; }
-        if (already) { okCount++; await say(`✅ «${name}» уже ввімкнено.`); continue; }
+          wasOn = (st0 ?? []).find((x) => x.code === code)?.value === true;
+        } catch (_) { wasOn = false; }
+        if (wasOn) { okCount++; already.push(name); continue; }
         if (switched && gap > 0) await sleep(gap * 1000);
         for (let k = 0; ; k++) {
           try {
@@ -93,12 +94,17 @@ async function run(token: string, silent: boolean) {
         await sleep(3000);
         const st = (await tuyaCall(c, "GET", `/v1.0/devices/${d.id}/status`, undefined, tk)) as { code: string; value: unknown }[];
         const on = (st ?? []).find((x) => x.code === code)?.value === true;
-        if (on) okCount++;
-        await say(on ? `✅ «${name}» ввімкнено (автоматично).` : `⚠️ Команду для «${name}» надіслано, але ввімкнення не підтверджено. Перевірте в Smart Life.`);
+        if (on) { okCount++; turned.push(name); }
+        if (!on) await say(`⚠️ Команду для «${name}» надіслано, але ввімкнення не підтверджено. Перевірте в Smart Life.`);
       } catch (e) {
         if (/offline|2008/i.test((e as Error).message)) offlineCount++;
         await say(`⚠️ «${name}»: ${(e as Error).message}`);
       }
+    }
+    if (turned.length || already.length) {
+      await say(turned.length
+        ? `✅ Бойлери ввімкнено (автоматично): ${turned.join(", ")}` + (already.length ? `. Уже були ввімкнені: ${already.join(", ")}` : "")
+        : `✅ Бойлери вже ввімкнені: ${already.join(", ")}`);
     }
     if (okCount === 0 && offlineCount > 0) {
       await sb.rpc("outage_st_set", { k: "boil_cycle", v: "" });
