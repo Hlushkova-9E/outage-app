@@ -1,4 +1,4 @@
-// Supabase Edge Function «bluetti-poll» (v9): кожні 2 хв читає стан Bluetti AC200PL і пише рядок у bluetti_log.
+// Supabase Edge Function «bluetti-poll» (v10): кожні 2 хв читає стан Bluetti AC200PL і пише рядок у bluetti_log.
 // Основний канал: REST gw.bluettipower.com/api/bluiotdata/ha/v1 (devices + deviceStates), ліміт відповіді 15 с.
 // v7 (07.11.2026): якщо REST мовчить/дає 5xx (відомі збої хмари Bluetti), резерв — push-канал (STOMP over WebSocket)
 //   wss://gw.bluettipower.com/api/edgeiotgw/ws-coordination/websocket: чекаємо DEVICE_REALTIME_STATUS до 100 с (сервер шле ~раз на 70 с),
@@ -105,7 +105,7 @@ async function wsFallback(tok: string, why: any) {
     return;
   }
   // AC: перемикач, якщо прийшов; інакше — є навантаження AC; інакше — як було в останньому справжньому записі
-  let ac: boolean | null = r.p.acSwitch != null ? String(r.p.acSwitch) === '1' : (n(r.p.powerAcOut) ?? 0) > 0 ? true : null;
+  let ac: boolean | null = r.p.acSwitch != null ? String(r.p.acSwitch) === '1' : n(r.p.powerAcOut) !== null ? (n(r.p.powerAcOut) as number) > 0 : null; // acSwitch у push не приходить: навантаження 0 Вт = AC вимкнено
   let sn = r.sn;
   if (ac === null || !sn) {
     const { data: lr } = await sb.from('bluetti_log').select('sn, ac').not('sn', 'is', null).order('at', { ascending: false }).limit(1).maybeSingle();
