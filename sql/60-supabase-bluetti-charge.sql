@@ -26,7 +26,7 @@ language plpgsql stable security definer set search_path to 'public' as $f$
 declare c jsonb := public.bluetti_charge(p_now); nx int := public.outage_home_next(p_now); tz text := public.tg_tzn(); pred numeric; t text;
 begin
   if c is null then return null; end if;
-  t := 'заряджеться до 100% ≈ о ' || to_char((p_now + make_interval(mins => (c ->> 'to100')::int)) at time zone tz, 'HH24:MI')
+  t := 'зарядиться до 100% ≈ о ' || to_char((p_now + make_interval(mins => (c ->> 'to100')::int)) at time zone tz, 'HH24:MI')
        || ' (через ' || public.outage_dur((c ->> 'to100')::int) || ')';
   if nx is not null and nx < (c ->> 'to100')::int then
     pred := least(100, (c ->> 'soc')::numeric + (c ->> 'rate')::numeric * nx);
