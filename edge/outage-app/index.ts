@@ -1,7 +1,8 @@
-// Supabase Edge Function «outage-app» (v8): віддає сторінці Mini App «📅 Графік» дані з бази.
+// Supabase Edge Function «outage-app» (v9): віддає сторінці Mini App «📅 Графік» дані з бази.
 // Перевірка підпису Telegram (initData) робиться в SQL-функціях outage_app_data (бот FamilyBot) і outage_house_data (будинковий бот), тут лише передача запиту.
 // v6: для будинкової версії додає блок збору (налаштування fundraise), якщо він увімкнений.
 // v7: анонімна статистика візитів (SQL 41): хеш (HMAC) Telegram user.id або IP+браузера, без імен; запис не ламає відповідь.
+// v9: вкладка «Історія» (SQL 57): POST {history:"РРРР-ММ", key|init_data} → outage_key_history / outage_app_history (лише Антон і Ксенія).
 // v8: особисті посилання без Telegram (SQL 56): POST {key, week} → outage_key_data; лише перегляд; невірний ключ → 401 із затримкою.
 // Verify JWT: вимкнено (сторінка публічна, доступ дає підпис Telegram або особистий ключ). Секрети не потрібні (ключ service_role Supabase підставляє сам).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
@@ -65,6 +66,20 @@ Deno.serve(async (req) => {
         await visit("web", ip + "|" + (req.headers.get("user-agent") ?? ""));
       }
       return json(await withFund(pr.data) ?? { ok: false }, pr.data?.ok ? 200 : 500);
+    }
+    if (body?.history !== undefined) {
+      const m = typeof body.history === "string" && /^\d{4}-\d{2}$/.test(body.history) ? body.history + "-01" : null;
+      let hr;
+      if (typeof body.key === "string") {
+        const key = body.key.trim();
+        if (key.length < 20 || key.length > 100) return json({ ok: false }, 401);
+        hr = await sb.rpc("outage_key_history", { p_key: key, p_month: m });
+      } else if (typeof body.init_data === "string" && body.init_data && body.init_data.length <= 4000) {
+        hr = await sb.rpc("outage_app_history", { p_init: body.init_data, p_month: m });
+      } else return json({ ok: false }, 400);
+      if (hr.error) { console.error("history", hr.error); return json({ ok: false }, 500); }
+      if (!hr.data?.ok) { await new Promise((r) => setTimeout(r, 700)); return json({ ok: false }, 401); }
+      return json(hr.data);
     }
     if (typeof body?.key === "string") {
       // особисте посилання (SQL 56): у базі лише відбиток ключа; лише перегляд
