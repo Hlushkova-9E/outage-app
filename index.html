@@ -285,7 +285,7 @@ const bpts = BL && sub.fact && BL.days ? (BL.days[day.date] || []) : [];
       + bar("План", day.known ? day.plan : [], "var(--off)")
       + (DATA.house ? "" : bar("Розетки", day.sock, "var(--sock)"))
       + bar("Svitlobot. Ввід 1", day.sb, "var(--sb)")
-      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null) : "")
+      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null, isToday && BL && BL.fresh && BL.soc != null ? Math.round(BL.soc) : null) : "")
       + (!DATA.house && bpts.some((x) => x[2]) ? '<div class="hnote">Коли квартира на Bluetti, розетки живить станція, тож у смузі «Розетки» відключення міста тоді не видно.</div>' : "")
       + '<div class="ticks"><span></span><div><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>';
     fact.style.display = "block";
@@ -302,7 +302,7 @@ const bpts = BL && sub.fact && BL.days ? (BL.days[day.date] || []) : [];
   $("m2").textContent = day.known ? "план " + dur(sum(day.plan)) + factText(day) : (day.emergency ? "🚨 поза графіком" : day.nodata ? "немає даних" : day.date < DATA.today ? "графіка не було" : "очікується графік");
 }
 
-function bltBar(pts, nowM) {
+function bltBar(pts, nowM, liveSoc) {
   let shade = "", lines = [], cur = [], prev = null;
   pts.forEach(([m, soc, ac]) => {
     if (ac) shade += '<rect x="' + m + '" y="0" width="10" height="100" fill="var(--blt)" opacity=".22"/>';
@@ -314,7 +314,7 @@ function bltBar(pts, nowM) {
   const pl = lines.map((c) => c.length === 1 ? '<circle cx="' + c[0].split(",")[0] + '" cy="' + c[0].split(",")[1] + '" r="6" fill="var(--blt)"/>'
     : '<polyline points="' + c.join(" ") + '" fill="none" stroke="var(--blt)" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>').join("");
   const last = pts[pts.length - 1];
-  return '<div class="bar"><span>Bluetti ' + last[1] + '%</span><div class="track blt"><svg viewBox="0 0 1440 100" preserveAspectRatio="none">' + shade + pl + '</svg>'
+  return '<div class="bar"><span>Bluetti ' + (liveSoc != null ? liveSoc : last[1]) + '%</span><div class="track blt"><svg viewBox="0 0 1440 100" preserveAspectRatio="none">' + shade + pl + '</svg>'
     + (nowM !== null ? '<div class="nowline" style="left:' + (nowM / 14.4) + '%"></div>' : "") + '</div></div>';
 }
 
@@ -366,7 +366,7 @@ $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
 // нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
-const VER = "2026-11-07.9";
+const VER = "2026-11-07.10";
 let verAt = Date.now();
 async function checkVer() {
   if (Date.now() - verAt < 600000) return;
