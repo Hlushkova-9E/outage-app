@@ -68,7 +68,7 @@
     .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
     .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
     .meta { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
-  .nowb{display:none;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.35;border:1px solid var(--line);background:var(--card)}.nowb.show{display:block}.nowb b{display:block;font-size:17px;margin-bottom:2px}.nowb.on{border-color:var(--bolt)}.nowb.offc{background:var(--off);border-color:var(--off);color:var(--offtext)}
+  .nowb{display:none;border-radius:14px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.35;border:1px solid var(--line);background:var(--card)}.nowb.show{display:block}.nowb b{display:block;font-size:17px;margin-bottom:2px}.nowb.on{border-color:var(--bolt)}.nowb.offc{background:var(--off);border-color:var(--off);color:var(--offtext)}.nowx{margin-top:4px;font-size:12.5px;opacity:.9}
 .fund{max-width:460px;margin:12px auto 0}.fundbox{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:14px}.fundh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:16px;font-weight:700}.fx{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 8px}.fundp{font-size:14px;line-height:1.45;margin:10px 0 8px}.funds{font-size:13.5px;line-height:1.55}.fundt{display:flex;gap:8px;margin:12px 0}.fundt div{flex:1;background:var(--seg);border-radius:12px;padding:8px;font-size:12px;color:var(--muted)}.fundt b{display:block;font-size:15px;color:var(--text);margin-top:2px}.fundn{font-size:12.5px;color:var(--muted);margin-bottom:10px}.fundr{background:var(--seg);border-radius:12px;padding:10px;font-size:13px;line-height:1.5}.fundr small{display:block;color:var(--muted);font-size:12px}.fundi{display:flex;gap:6px;align-items:center;margin:6px 0}.fundi code{flex:1;font-size:12px;background:var(--card);border-radius:8px;padding:6px;word-break:break-all;user-select:text;-webkit-user-select:text}.fbtn{border:0;border-radius:12px;padding:11px;font-size:14px;background:var(--off);color:var(--offtext)}.fbtn.sm{border-radius:8px;padding:6px 8px;font-size:12px}.fbtn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.fundb{display:flex;gap:8px;margin-top:12px}.fundb .fbtn{flex:1}.fundstrip{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:14px;color:var(--text);text-align:left}
 </style>
 </head>
@@ -184,9 +184,27 @@ else if (!planOff && !sbOff) sub2 = "за графіком і за Svitlobot (В
 else if (!planOff && sbOff) sub2 = "Svitlobot (Ввід 1): вимкнено · за графіком мало б бути";
 else if (planOff && sbOff) sub2 = "за графіком і за Svitlobot (Ввід 1)";
 else sub2 = "Svitlobot (Ввід 1): є · за графіком мало б не бути";
-const b = document.createElement("b"); b.textContent = (on ? "💡 Світло є" : "🌑 Світла немає");
+const hm2 = (m) => pad(Math.floor(m / 60) % 24) + ":" + pad(m % 60);
+let since = "";
+const sl = DATA.sb_last;
+if (sl && sl.at && (sl.kind === "off") === sbOff && DATA.now - sl.at < 20 * 3600000) since = " з " + hm2(kyivMinutes(sl.at));
+const b = document.createElement("b"); b.textContent = (on ? "💡 Світло є" : "🌑 Світла немає") + since;
 const d2 = document.createElement("div"); d2.textContent = sub2;
 nb.append(b, d2);
+// наступна зміна за графіком (з урахуванням завтра, якщо він у цьому тижні)
+let nxt = "";
+if (planKnown) {
+  const tmr = sub.days[dayIdx + 1];
+  const tk = !!(tmr && tmr.known && !tmr.emergency);
+  const mg = [];
+  day.plan.concat(tk ? tmr.plan.map(([x, y]) => [x + 1440, y + 1440]) : []).slice().sort((x, y) => x[0] - y[0])
+    .forEach(([x, y]) => { const l = mg[mg.length - 1]; if (l && x <= l[1]) l[1] = Math.max(l[1], y); else mg.push([x, y]); });
+  const cur = mg.find(([x, y]) => x <= fm && y > fm);
+  if (cur) nxt = cur[1] >= 1440 && !tk ? "За графіком без світла до кінця доби" : "За графіком світло з'явиться о " + hm2(cur[1]) + " (через " + dur(cur[1] - fm) + ")";
+  else if (!sbOff) { const n = mg.find(([x]) => x > fm); if (n) nxt = "Наступне відключення за графіком о " + hm2(n[0]) + (n[0] >= 1440 ? " завтра" : "") + " (через " + dur(n[0] - fm) + ")"; else if (!tk) nxt = "Сьогодні відключень за графіком більше немає"; }
+}
+if (nxt) { const d3 = document.createElement("div"); d3.className = "nowx"; d3.textContent = "⏭ " + nxt; nb.append(d3); }
+if (DATA.sb_ok && DATA.now - DATA.sb_ok > 15 * 60000) { const d4 = document.createElement("div"); d4.className = "nowx"; d4.textContent = "⚠️ Svitlobot не перевірявся " + dur(Math.round((DATA.now - DATA.sb_ok) / 60000)) + ", стан може бути неточним"; nb.append(d4); }
 nb.className = "nowb show " + (on ? "on" : "offc");
 }
 // сітка
