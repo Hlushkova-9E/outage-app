@@ -97,7 +97,7 @@ const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-let DATA = null, subIdx = 0, dayIdx = 0, WEEK = 0, busy = false;
+let DATA = null, subIdx = 0, dayIdx = 0, WEEK = 0, busy = false, lastLoad = 0;
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
 const hhmm = (m) => pad(Math.floor(m / 60) % 24) + ":" + pad(m % 60);
@@ -252,11 +252,13 @@ function pickDay(d, keepDay) {
   return keepDay ? dayIdx : 0;
 }
 
-async function load(week) {
+async function load(week, quiet) {
   const pub = !(tg && tg.initData) && /[?&]house\b/.test(location.search);
   if (!pub && (!tg || !tg.initData)) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
   const first = DATA === null;
-  busy = true; if (!first) render();
+  if (quiet && (first || busy)) return;
+  lastLoad = Date.now();
+  busy = true; if (!first && !quiet) render();
   try {
     const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pub ? { public: "house", week } : { init_data: tg.initData, week }) });
     if (r.status === 401) { msg("🔒", "Не вдалося підтвердити вхід. Закрийте і відкрийте графік із бота ще раз."); return; }
@@ -264,20 +266,30 @@ async function load(week) {
     if (!r.ok || !d.ok) throw new Error(r.status);
     if (!d.subs.length) { msg("ℹ️", "Для вас ще немає підписок на графік."); return; }
     const key = DATA && DATA.subs[subIdx] ? DATA.subs[subIdx].key : null;
+    const prevDay = DATA && DATA.subs[subIdx] ? DATA.subs[subIdx].days[dayIdx] : null;
+    const wasToday = !!prevDay && prevDay.date === DATA.today;
     DATA = d;
     WEEK = typeof d.week === "number" ? d.week : 0;
     subIdx = Math.max(0, d.subs.findIndex((x) => x.key === key));
-    dayIdx = pickDay(d, !first);
+    dayIdx = quiet && !wasToday ? Math.min(dayIdx, d.subs[subIdx].days.length - 1) : pickDay(d, !first);
     busy = false;
     render();
   } catch (e) {
     busy = false;
     if (first) msg("⚠️", "Не вдалося завантажити графік. Спробуйте відкрити ще раз.");
+    else if (quiet) render();
     else { render(); $("wlabel").textContent = "Не вдалося завантажити"; }
   } finally { busy = false; }
 }
 $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
+// автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
+function refresh() { if (document.visibilityState === "visible" && DATA && !busy) load(WEEK, true); }
+setInterval(refresh, 120000);
+const onBack = () => { if (document.visibilityState === "visible" && Date.now() - lastLoad > 30000) refresh(); };
+document.addEventListener("visibilitychange", onBack);
+window.addEventListener("focus", onBack);
+if (tg && tg.onEvent) { try { tg.onEvent("activated", onBack); } catch (e) {} }
 (function(){
  var fundOpen=null, KEY="fund_hide_";
  function hid(f){try{var t=+localStorage.getItem(KEY+(f.v||1));return !!t&&Date.now()-t<172800000;}catch(e){return false;}}
