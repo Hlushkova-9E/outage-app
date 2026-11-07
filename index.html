@@ -2,11 +2,13 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Графік світла</title>
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Графік 9Є">
-  <script>if (/[?&]house\b/.test(location.search)) document.title = "Графік відключень. Глушкова, 9Є";</script>
+  <script>if (/[?&]house\b/.test(location.search)) document.title = "Графік відключень. Глушкова, 9Є";
+  else if (/[?&]k=/.test(location.search)) { document.title = "Світло вдома"; document.querySelector('meta[name="apple-mobile-web-app-title"]').content = "Світло вдома"; }</script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -99,6 +101,7 @@ const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
+const KEY = (new URLSearchParams(location.search).get("k") || "").trim();
 let DATA = null, subIdx = 0, dayIdx = 0, WEEK = 0, busy = false, lastLoad = 0;
 const $ = (id) => document.getElementById(id);
 const pad = (n) => String(n).padStart(2, "0");
@@ -310,15 +313,16 @@ function pickDay(d, keepDay) {
 }
 
 async function load(week, quiet) {
-  const pub = !(tg && tg.initData) && /[?&]house\b/.test(location.search);
-  if (!pub && (!tg || !tg.initData)) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
+  const viaTg = !!(tg && tg.initData);
+  const pub = !viaTg && !KEY && /[?&]house\b/.test(location.search);
+  if (!pub && !viaTg && !KEY) { msg("📲", "Відкрийте графік кнопкою «📅 Графік» у боті Telegram."); return; }
   const first = DATA === null;
   if (quiet && (first || busy)) return;
   lastLoad = Date.now();
   busy = true; if (!first && !quiet) render();
   try {
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pub ? { public: "house", week } : { init_data: tg.initData, week }) });
-    if (r.status === 401) { msg("🔒", "Не вдалося підтвердити вхід. Закрийте і відкрийте графік із бота ще раз."); return; }
+    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(pub ? { public: "house", week } : viaTg ? { init_data: tg.initData, week } : { key: KEY, week }) });
+    if (r.status === 401) { msg("🔒", viaTg ? "Не вдалося підтвердити вхід. Закрийте і відкрийте графік із бота ще раз." : "Це особисте посилання більше не діє. Потрібне нове посилання (воно приходить у Telegram від FamilyBot)."); return; }
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(r.status);
     if (!d.subs.length) { msg("ℹ️", "Для вас ще немає підписок на графік."); return; }
@@ -342,7 +346,7 @@ $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
 // нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
-const VER = "2026-11-07.3";
+const VER = "2026-11-07.4";
 let verAt = Date.now();
 async function checkVer() {
   if (Date.now() - verAt < 600000) return;
