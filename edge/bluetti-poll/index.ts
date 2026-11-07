@@ -1,4 +1,4 @@
-// Supabase Edge Function «bluetti-poll» (v7): кожні 2 хв читає стан Bluetti AC200PL і пише рядок у bluetti_log.
+// Supabase Edge Function «bluetti-poll» (v9): кожні 2 хв читає стан Bluetti AC200PL і пише рядок у bluetti_log.
 // Основний канал: REST gw.bluettipower.com/api/bluiotdata/ha/v1 (devices + deviceStates), ліміт відповіді 15 с.
 // v7 (07.11.2026): якщо REST мовчить/дає 5xx (відомі збої хмари Bluetti), резерв — push-канал (STOMP over WebSocket)
 //   wss://gw.bluettipower.com/api/edgeiotgw/ws-coordination/websocket: чекаємо DEVICE_REALTIME_STATUS до 100 с (сервер шле ~раз на 70 с),
@@ -97,9 +97,9 @@ function wsRead(tok: string): Promise<{ sn: string | null; p: any; partial: bool
 }
 
 async function wsFallback(tok: string, why: any) {
-  // час рядка = початок опитування, щоб наступний запуск cron (через 2 хв) не відкинувся як «too soon»
-  const at = new Date().toISOString();
   const r = await wsRead(tok);
+  // час рядка = момент, коли отримано дані (а не початок прослуховування), щоб на сторінці «оновлено» було правдивим
+  const at = new Date().toISOString();
   if (!r.p || n(r.p.batterySoc) === null) {
     await sb.from('bluetti_log').insert({ at, online: null, raw: { ...why, ws: r.err ?? 'no data' } });
     return;
@@ -133,8 +133,9 @@ Deno.serve(async (req) => {
     let tok = a.access_token as string;
     if (a.refresh_token && a.expires_at && new Date(a.expires_at).getTime() - Date.now() < 7 * 86400000) tok = (await refresh(a.refresh_token).catch(() => null)) || tok;
     if (!bind && !force) {
-      const { data: last } = await sb.from('bluetti_log').select('at').order('at', { ascending: false }).limit(1).maybeSingle();
-      if (last && Date.now() - new Date(last.at).getTime() < 90000) return new Response('too soon');
+      const { data: last } = await sb.from('bluetti_log').select('at, via:raw->>via').order('at', { ascending: false }).limit(1).maybeSingle();
+      // рядок з резервного каналу ставиться наприкінці прослуховування (до 100 с), тому для нього захист лише 10 с
+      if (last && Date.now() - new Date(last.at).getTime() < (last.via === 'ws' ? 10000 : 90000)) return new Response('too soon');
     }
     let dev = await get(tok, '/api/bluiotdata/ha/v1/devices');
     if (expired(dev) && a.refresh_token) { const nt = await refresh(a.refresh_token).catch(() => null); if (nt) { tok = nt; dev = await get(tok, '/api/bluiotdata/ha/v1/devices'); } }
