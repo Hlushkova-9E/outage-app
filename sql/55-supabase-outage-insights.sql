@@ -212,3 +212,17 @@ begin
     execute d;
   end if;
 end $do$;
+
+-- 55c/55d: оцінка часу роботи на сторінці за медіаною навантаження з моменту переходу на Bluetti (bl_since), а не за миттєвим значенням
+do $do$
+declare d text; f text;
+begin
+  d := pg_get_functiondef('public.bluetti_app(date)'::regprocedure);
+  f := $q$greatest(coalesce((b ->> 'acw')::numeric, 0), 30)$q$;
+  if position(f in d) > 0 then
+    d := replace(d, f, $q$greatest(coalesce((select percentile_cont(0.5) within group (order by coalesce(l.ac_w, 0))::numeric from public.bluetti_log l
+         where l.sn is not null and l.online and l.at >= coalesce(nullif(public.outage_st_get('bl_since'), '')::timestamptz, now() - interval '15 minutes')),
+       (b ->> 'acw')::numeric, 0), 30)$q$);
+    execute d;
+  end if;
+end $do$;
