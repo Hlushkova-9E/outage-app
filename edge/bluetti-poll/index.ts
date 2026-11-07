@@ -1,7 +1,7 @@
 // Supabase Edge Function «bluetti-poll» (v7): кожні 2 хв читає стан Bluetti AC200PL і пише рядок у bluetti_log.
 // Основний канал: REST gw.bluettipower.com/api/bluiotdata/ha/v1 (devices + deviceStates), ліміт відповіді 15 с.
 // v7 (07.11.2026): якщо REST мовчить/дає 5xx (відомі збої хмари Bluetti), резерв — push-канал (STOMP over WebSocket)
-//   wss://gw.bluettipower.com/api/edgeiotgw/ws-coordination/websocket: чекаємо DEVICE_REALTIME_STATUS (сервер шле ~раз на 70 с),
+//   wss://gw.bluettipower.com/api/edgeiotgw/ws-coordination/websocket: чекаємо DEVICE_REALTIME_STATUS до 100 с (сервер шле ~раз на 70 с),
 //   пишемо soc / ac_w / grid_w з raw.via = 'ws'. Працює у фоні (EdgeRuntime.waitUntil), щоб cron не чекав.
 //   Сервер пускає лише з x-app-ver ≥ 2.0.0 (з 1.0.0 відповідає msgCode 600 «Upgrade required»).
 // Секрети (лише назви): BLUETTI_CLIENT_SECRET, BLUETTI_APP_KEY — у Supabase → Edge Functions → Secrets. Токени — у таблиці bluetti_auth.
@@ -12,7 +12,7 @@ const GW = 'https://gw.bluettipower.com';
 const WSS = 'wss://gw.bluettipower.com/api/edgeiotgw/ws-coordination/websocket';
 const APP_VER = '2.0.0';
 const REST_MS = 15000;
-const WS_MS = 80000;
+const WS_MS = 100000; // сервер шле повне повідомлення ~раз на 70 с, але буває й довше (07.11 19:48 за 80 с нічого)
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 // REST лишається з x-app-ver 1.0.0, як працювало з першого дня; 2.0.0 потрібна лише push-каналу
 const H = (tok: string) => ({ Authorization: tok, 'x-os': 'open', 'x-app-key': Deno.env.get('BLUETTI_APP_KEY') || '', 'x-app-ver': '1.0.0' });
