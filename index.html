@@ -325,10 +325,13 @@ function bltBar(pts, nowM, liveSoc) {
 function voltBar(pts, nowM, bl) {
   const y = (v) => +(100 - (Math.max(218, Math.min(262, v)) - 218) / 44 * 100).toFixed(1);
   let lines = [], cur = [], prev = null, dots = "", mx = 0, shade = "";
-  (bl || []).forEach(([m, , ac]) => { if (ac) shade += '<rect x="' + m + '" y="0" width="10" height="100" fill="var(--muted)" opacity=".18"/>'; });
+  const onBl = new Set();
+  (bl || []).forEach(([m, , ac]) => { if (ac) { onBl.add(m); shade += '<rect x="' + m + '" y="0" width="10" height="100" fill="var(--muted)" opacity=".18"/>'; } });
   pts.forEach(([m, v]) => {
     if (prev !== null && m - prev > 60) { if (cur.length) lines.push(cur); cur = []; }
-    cur.push((m + 5) + "," + y(v / 10)); prev = m; mx = Math.max(mx, v);
+    cur.push((m + 5) + "," + y(v / 10)); prev = m;
+    if (onBl.has(m)) return;
+    mx = Math.max(mx, v);
     if (v >= 2460) dots += '<i class="vdot" style="left:' + ((m + 5) / 14.4).toFixed(2) + '%;top:' + y(v / 10) + '%;background:' + (v >= 2550 ? "#d14343" : v >= 2500 ? "#e08a00" : "#e0b000") + '"></i>';
   });
   if (cur.length) lines.push(cur);
@@ -338,7 +341,7 @@ function voltBar(pts, nowM, bl) {
   const pl = lines.map((c) => c.length === 1 ? '<circle cx="' + c[0].split(",")[0] + '" cy="' + c[0].split(",")[1] + '" r="6" fill="var(--volt)"/>'
     : '<polyline points="' + c.join(" ") + '" fill="none" stroke="var(--volt)" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>').join("");
   const st = mx >= 2550 ? ' style="color:#d14343"' : mx >= 2500 ? ' style="color:#e08a00"' : mx >= 2460 ? ' style="color:#c99700"' : "";
-  return '<div class="bar"><span>Напруга<br><b' + st + '>макс. ' + (mx / 10).toFixed(1).replace(".", ",") + ' В</b></span><div class="track volt"><svg viewBox="0 0 1440 100" preserveAspectRatio="none">'
+  return '<div class="bar"><span>Напруга<br><b' + st + '>' + (mx ? 'макс. ' + (mx / 10).toFixed(1).replace(".", ",") + ' В' : 'на Bluetti') + '</b></span><div class="track volt"><svg viewBox="0 0 1440 100" preserveAspectRatio="none">'
     + shade + zone(255, 262, "#d14343") + zone(250, 255, "#e08a00") + zone(246, 250, "#e0b000") + guide(230, "var(--muted)") + guide(250, "#e08a00") + guide(255, "#d14343") + pl + '</svg>' + dots
     + lab(255, "255", "#d14343") + lab(250, "250", "#e08a00", 1) + lab(230, "230", "var(--muted)")
     + (nowM !== null ? '<div class="nowline" style="left:' + (nowM / 14.4) + '%"></div>' : "") + '</div></div>';
@@ -392,7 +395,7 @@ $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
 // нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
-const VER = "2026-11-09.4";
+const VER = "2026-11-09.5";
 let verAt = Date.now();
 async function checkVer() {
   if (Date.now() - verAt < 600000) return;
