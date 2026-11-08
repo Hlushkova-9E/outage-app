@@ -285,7 +285,7 @@ const bpts = BL && sub.fact && BL.days ? (BL.days[day.date] || []) : [];
       + bar("План", day.known ? day.plan : [], "var(--off)")
       + (DATA.house ? "" : bar("Розетки", day.sock, "var(--sock)"))
       + bar("Svitlobot. Ввід 1", day.sb, "var(--sb)")
-      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null, isToday && BL && BL.fresh && BL.soc != null ? Math.round(BL.soc) : null) : "")
+      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null, isToday && BL && BL.fresh && BL.online && BL.soc != null ? Math.round(BL.soc) : isToday && BL && BL.last_soc != null ? Math.round(BL.last_soc) : null) : "")
       + (!DATA.house && bpts.some((x) => x[2]) ? '<div class="hnote">Коли квартира на Bluetti, розетки живить станція, тож у смузі «Розетки» відключення міста тоді не видно.</div>' : "")
       + '<div class="ticks"><span></span><div><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>';
     fact.style.display = "block";
@@ -366,7 +366,7 @@ $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
 // нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
-const VER = "2026-11-07.10";
+const VER = "2026-11-08.1";
 let verAt = Date.now();
 async function checkVer() {
   if (Date.now() - verAt < 600000) return;
