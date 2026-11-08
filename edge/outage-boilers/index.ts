@@ -1,4 +1,4 @@
-// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці.
+// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці. v4 (08.11.2026): «вже ввімкнені» не надсилаємо; при короткому збої (body.note) пишемо лише якщо щось реально ввімкнули.
 // Захист: заголовок X-Telegram-Bot-Api-Secret-Token має збігатися з tg_settings.secret.
 // Логіка Tuya скопійована з telegram-bot (runBoilers), бюджетний бот не змінюється.
 // Якщо жодна розетка не ввімкнулась через offline, цикл не вважається обробленим (boil_cycle = '', пауза 10 хв).
@@ -50,7 +50,7 @@ async function tg(token: string, body: Record<string, unknown>) {
   if (!r.ok) console.error("tg", r.status, await r.text());
 }
 
-async function run(token: string, silent: boolean) {
+async function run(token: string, silent: boolean, note: string) {
   const { data: ppl } = await sb.from("tg_people").select("chat_id");
   const ids = (ppl ?? []).map((r: { chat_id: string }) => r.chat_id);
   const say = (text: string) => Promise.all(ids.map((c) => tg(token, { chat_id: c, text, disable_notification: silent })));
@@ -101,10 +101,8 @@ async function run(token: string, silent: boolean) {
         await say(`⚠️ «${name}»: ${(e as Error).message}`);
       }
     }
-    if (turned.length || already.length) {
-      await say(turned.length
-        ? `✅ Бойлери ввімкнено (автоматично): ${turned.join(", ")}` + (already.length ? `. Уже були ввімкнені: ${already.join(", ")}` : "")
-        : `✅ Бойлери вже ввімкнені: ${already.join(", ")}`);
+    if (turned.length) {
+      await say(`✅ Бойлери ввімкнено ${note ? `після збою (${note})` : "(автоматично)"}: ${turned.join(", ")}` + (already.length ? `. Уже були ввімкнені: ${already.join(", ")}` : ""));
     }
     if (okCount === 0 && offlineCount > 0) {
       await sb.rpc("outage_st_set", { k: "boil_cycle", v: "" });
@@ -124,6 +122,6 @@ Deno.serve(async (req) => {
   if (!s?.token || !s?.secret) return new Response("not configured");
   if (req.headers.get("x-telegram-bot-api-secret-token") !== s.secret) return new Response("forbidden", { status: 403 });
   const body = await req.json().catch(() => ({}));
-  bg(run(s.token, !!body.silent));
+  bg(run(s.token, !!body.silent, typeof body.note === "string" ? body.note.slice(0, 120) : ""));
   return new Response("started");
 });
