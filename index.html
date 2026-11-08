@@ -215,7 +215,7 @@ if (planKnown) {
   day.plan.concat(tk ? tmr.plan.map(([x, y]) => [x + 1440, y + 1440]) : []).slice().sort((x, y) => x[0] - y[0])
     .forEach(([x, y]) => { const l = mg[mg.length - 1]; if (l && x <= l[1]) l[1] = Math.max(l[1], y); else mg.push([x, y]); });
   const cur = mg.find(([x, y]) => x <= fm && y > fm);
-  if (cur && on) nxt = "За графіком відключення мало тривати до " + hm2(cur[1]) + " (ще " + dur(cur[1] - fm) + "), але світло вже повернулось";
+  if (cur && on) nxt = "За графіком відключення мало тривати до " + hm2(cur[1]) + " (ще " + dur(cur[1] - fm) + "), але світло є";
   else if (cur) nxt = cur[1] >= 1440 && !tk ? "За графіком без світла до кінця доби" : "За графіком світло з'явиться о " + hm2(cur[1]) + " (через " + dur(cur[1] - fm) + ")";
   else if (!sbOff) { const n = mg.find(([x]) => x > fm); if (n) nxt = "Наступне відключення за графіком о " + hm2(n[0]) + (n[0] >= 1440 ? " завтра" : "") + " (через " + dur(n[0] - fm) + ")"; else if (!tk) nxt = "Сьогодні відключень за графіком більше немає"; }
 }
@@ -285,7 +285,7 @@ const bpts = BL && sub.fact && BL.days ? (BL.days[day.date] || []) : [];
       + bar("План", day.known ? day.plan : [], "var(--off)")
       + (DATA.house ? "" : bar("Розетки", day.sock, "var(--sock)"))
       + bar("Svitlobot. Ввід 1", day.sb, "var(--sb)")
-      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null, isToday && BL && BL.fresh && BL.soc != null ? Math.round(BL.soc) : null) : "")
+      + (bpts.length ? bltBar(bpts, isToday ? nowMin : null, isToday && BL && BL.fresh && BL.online && BL.soc != null ? Math.round(BL.soc) : isToday && BL && BL.last_soc != null ? Math.round(BL.last_soc) : null) : "")
       + (!DATA.house && bpts.some((x) => x[2]) ? '<div class="hnote">Коли квартира на Bluetti, розетки живить станція, тож у смузі «Розетки» відключення міста тоді не видно.</div>' : "")
       + '<div class="ticks"><span></span><div><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>';
     fact.style.display = "block";
@@ -366,7 +366,7 @@ $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
 // нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
-const VER = "2026-11-07.10";
+const VER = "2026-11-08.2";
 let verAt = Date.now();
 async function checkVer() {
   if (Date.now() - verAt < 600000) return;
