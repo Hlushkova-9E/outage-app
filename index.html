@@ -298,7 +298,7 @@ const vpts = BL && sub.fact && BL.volt ? (BL.volt[day.date] || []) : [];
   if (showEm) lg.push('<span><i style="background:var(--emerg)"></i>екстрені</span>');
   if (sub.fact && day.date <= DATA.today && !day.nodata) { if (!DATA.house) lg.push('<span><i style="background:var(--sock)"></i>розетки (лінія вдома)</span>'); lg.push('<span><i style="background:var(--sb)"></i>Svitlobot. Ввід 1</span>'); }
   if (bpts.length && $("fact").style.display !== "none") lg.push('<span><i style="background:var(--blt)"></i>Bluetti: лінія — заряд, заливка — живив квартиру</span>');
-  if (vpts.length && $("fact").style.display !== "none") lg.push('<span><i style="background:var(--volt)"></i>напруга в мережі (максимум за 10 хв)</span>', '<span><i style="background:#e08a00"></i>246–250 В: ризик, ЗУБР близько</span>', '<span><i style="background:#d14343"></i>понад 250 В: ЗУБР вимикає квартиру</span>', bpts.some((x) => x[2]) ? '<span><i style="background:var(--muted);opacity:.4"></i>сіре: квартира на Bluetti, це напруга станції</span>' : "");
+  if (vpts.length && $("fact").style.display !== "none") lg.push('<span><i style="background:var(--volt)"></i>напруга в мережі (максимум за 10 хв)</span>', '<span><i style="background:#e0b000"></i>246–250 В: близько до відключення розеток</span>', '<span><i style="background:#e08a00"></i>250–255 В: розетки бойлерів вимикаються (їхній захист)</span>', '<span><i style="background:#d14343"></i>понад 255 В: ЗУБР вимикає квартиру</span>', bpts.some((x) => x[2]) ? '<span><i style="background:var(--muted);opacity:.4"></i>сіре: квартира на Bluetti, це напруга станції</span>' : "");
   $("legend").innerHTML = lg.join("");
   // підсумок
   $("m1").textContent = "Черга " + sub.grp + " · " + DAYS[dayIdx] + ", " + dm(day.date);
@@ -321,7 +321,7 @@ function bltBar(pts, nowM, liveSoc) {
     + (nowM !== null ? '<div class="nowline" style="left:' + (nowM / 14.4) + '%"></div>' : "") + '</div></div>';
 }
 
-// напруга розетки «Бойлер основний»: максимум за 10 хв, шкала 218–258 В; зони: норма до 246, ризик 246–250, ЗУБР від 250; сіре — квартира на Bluetti
+// напруга розетки «Бойлер основний»: максимум за 10 хв, шкала 218–258 В; зони: норма до 246, близько 246–250, розетки вимикаються 250–255, ЗУБР від 255; сіре — квартира на Bluetti
 function voltBar(pts, nowM, bl) {
   const y = (v) => +(100 - (Math.max(218, Math.min(258, v)) - 218) / 40 * 100).toFixed(1);
   let lines = [], cur = [], prev = null, dots = "", mx = 0, shade = "";
@@ -329,7 +329,7 @@ function voltBar(pts, nowM, bl) {
   pts.forEach(([m, v]) => {
     if (prev !== null && m - prev > 60) { if (cur.length) lines.push(cur); cur = []; }
     cur.push((m + 5) + "," + y(v / 10)); prev = m; mx = Math.max(mx, v);
-    if (v >= 2460) dots += '<i class="vdot" style="left:' + ((m + 5) / 14.4).toFixed(2) + '%;top:' + y(v / 10) + '%;background:' + (v >= 2500 ? "#d14343" : "#e08a00") + '"></i>';
+    if (v >= 2460) dots += '<i class="vdot" style="left:' + ((m + 5) / 14.4).toFixed(2) + '%;top:' + y(v / 10) + '%;background:' + (v >= 2550 ? "#d14343" : v >= 2500 ? "#e08a00" : "#e0b000") + '"></i>';
   });
   if (cur.length) lines.push(cur);
   const zone = (a, b, c) => '<rect x="0" width="1440" y="' + y(b) + '" height="' + (y(a) - y(b)) + '" fill="' + c + '" opacity=".16"/>';
@@ -337,10 +337,10 @@ function voltBar(pts, nowM, bl) {
   const lab = (v, t, c) => '<i class="vlab" style="top:' + y(v) + '%;color:' + c + '">' + t + '</i>';
   const pl = lines.map((c) => c.length === 1 ? '<circle cx="' + c[0].split(",")[0] + '" cy="' + c[0].split(",")[1] + '" r="6" fill="var(--volt)"/>'
     : '<polyline points="' + c.join(" ") + '" fill="none" stroke="var(--volt)" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>').join("");
-  const st = mx >= 2500 ? ' style="color:#d14343"' : mx >= 2460 ? ' style="color:#e08a00"' : "";
+  const st = mx >= 2550 ? ' style="color:#d14343"' : mx >= 2500 ? ' style="color:#e08a00"' : mx >= 2460 ? ' style="color:#c99700"' : "";
   return '<div class="bar"><span>Напруга<br><b' + st + '>макс. ' + (mx / 10).toFixed(1).replace(".", ",") + ' В</b></span><div class="track volt"><svg viewBox="0 0 1440 100" preserveAspectRatio="none">'
-    + shade + zone(250, 260, "#d14343") + zone(246, 250, "#e08a00") + guide(230, "var(--muted)") + guide(250, "#d14343") + pl + '</svg>' + dots
-    + lab(250, "250", "#d14343") + lab(230, "230", "var(--muted)")
+    + shade + zone(255, 260, "#d14343") + zone(250, 255, "#e08a00") + zone(246, 250, "#e0b000") + guide(230, "var(--muted)") + guide(250, "#e08a00") + guide(255, "#d14343") + pl + '</svg>' + dots
+    + lab(255, "255", "#d14343") + lab(250, "250", "#e08a00") + lab(230, "230", "var(--muted)")
     + (nowM !== null ? '<div class="nowline" style="left:' + (nowM / 14.4) + '%"></div>' : "") + '</div></div>';
 }
 
@@ -392,7 +392,7 @@ $("wprev").onclick = () => { if (!busy) load(WEEK - 1); };
 $("wnext").onclick = () => { if (!busy) load(WEEK + 1); };
 // автооновлення: раз на 2 хв, поки сторінка на екрані, і одразу при поверненні (якщо минуло понад 30 с)
 // нова версія сторінки: перевірка не частіше раз на 10 хв, при зміні VER сторінка перезавантажується сама
-const VER = "2026-11-09.2";
+const VER = "2026-11-09.3";
 let verAt = Date.now();
 async function checkVer() {
   if (Date.now() - verAt < 600000) return;
