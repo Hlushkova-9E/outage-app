@@ -1,0 +1,2 @@
+-- 73: outage_sock_notify мовчить про збій за розетками, який уже закінчився й тривав <5 хв
+-- (рядок: if v.en is not null and v.en - v.st < interval '5 minutes' then continue; end if; перед перевіркою outage_log).
