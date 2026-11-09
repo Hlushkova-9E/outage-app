@@ -1,4 +1,4 @@
-// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці. v4 (08.11.2026): «вже ввімкнені» не надсилаємо; при короткому збої (body.note) пишемо лише якщо щось реально ввімкнули.
+// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці. v4 (08.11.2026): «вже ввімкнені» не надсилаємо; при короткому збої (body.note) пишемо лише якщо щось реально ввімкнули. v5 (09.11.2026): помилки розеток не надсилаємо, а пишемо в стан boil_fail (базa сама попередить через годину); при успіху boil_last_ok.
 // Захист: заголовок X-Telegram-Bot-Api-Secret-Token має збігатися з tg_settings.secret.
 // Логіка Tuya скопійована з telegram-bot (runBoilers), бюджетний бот не змінюється.
 // Якщо жодна розетка не ввімкнулась через offline, цикл не вважається обробленим (boil_cycle = '', пауза 10 хв).
@@ -55,7 +55,7 @@ async function run(token: string, silent: boolean, note: string) {
   const ids = (ppl ?? []).map((r: { chat_id: string }) => r.chat_id);
   const say = (text: string) => Promise.all(ids.map((c) => tg(token, { chat_id: c, text, disable_notification: silent })));
   let okCount = 0, offlineCount = 0;
-  const turned: string[] = [], already: string[] = []; // v3: один підсумок замість «✅» по кожній розетці
+  const turned: string[] = [], already: string[] = [], failed: string[] = []; // v3: один підсумок замість «✅» по кожній розетці
   try {
     const { data: cfg } = await sb.from("tuya_settings").select("*").eq("id", 1).maybeSingle();
     const c = cfg as TuyaCfg | null;
@@ -71,7 +71,7 @@ async function run(token: string, silent: boolean, note: string) {
     let switched = false;
     for (const name of names) {
       const d = (devs ?? []).find((x) => norm(x.name ?? "") === norm(name));
-      if (!d) { await say(`⚠️ Не знайдено розетку «${name}» у Smart Life.`); continue; }
+      if (!d) { failed.push(name); continue; }
       const code = switchCode(d);
       try {
         let wasOn = false;
@@ -95,10 +95,11 @@ async function run(token: string, silent: boolean, note: string) {
         const st = (await tuyaCall(c, "GET", `/v1.0/devices/${d.id}/status`, undefined, tk)) as { code: string; value: unknown }[];
         const on = (st ?? []).find((x) => x.code === code)?.value === true;
         if (on) { okCount++; turned.push(name); }
-        if (!on) await say(`⚠️ Команду для «${name}» надіслано, але ввімкнення не підтверджено. Перевірте в Smart Life.`);
+        if (!on) failed.push(name);
       } catch (e) {
-        if (/offline|2008/i.test((e as Error).message)) offlineCount++;
-        await say(`⚠️ «${name}»: ${(e as Error).message}`);
+        if (/offline|2001|2008/i.test((e as Error).message)) offlineCount++;
+        failed.push(name);
+        console.error("socket", name, (e as Error).message);
       }
     }
     if (turned.length) {
@@ -107,11 +108,21 @@ async function run(token: string, silent: boolean, note: string) {
     if (okCount === 0 && offlineCount > 0) {
       await sb.rpc("outage_st_set", { k: "boil_cycle", v: "" });
       await sb.rpc("outage_st_set", { k: "boil_hold", v: new Date(Date.now() + 10 * 60000).toISOString() });
-      await say("ℹ️ Розетки без зв'язку. Спробую ввімкнути бойлери ще раз, коли живлення стабілізується.");
     }
   } catch (e) {
-    await say(`⚠️ Tuya (автовмикання): ${(e as Error).message}`);
+    console.error("tuya", (e as Error).message);
+    failed.push("Tuya");
   } finally {
+    // v5: стан для бази: успіх або перша невдача (попередження надсилає outage_pwr_tick через годину)
+    try {
+      if (failed.length === 0 && okCount > 0) {
+        await sb.rpc("outage_st_set", { k: "boil_last_ok", v: new Date().toISOString() });
+        await sb.rpc("outage_st_set", { k: "boil_fail", v: "" });
+      } else if (failed.length) {
+        const { data: cur } = await sb.rpc("outage_st_get", { k: "boil_fail" });
+        if (!cur) await sb.rpc("outage_st_set", { k: "boil_fail", v: new Date().toISOString() });
+      }
+    } catch (e) { console.error("state", e); }
     await sb.rpc("tg_state_set", { k: "boilers_run", v: "" });
   }
 }
