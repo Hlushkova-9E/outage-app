@@ -1,4 +1,4 @@
-// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці. v4 (08.11.2026): «вже ввімкнені» не надсилаємо; при короткому збої (body.note) пишемо лише якщо щось реально ввімкнули. v5 (09.11.2026): помилки розеток не надсилаємо, а пишемо в стан boil_fail (базa сама попередить через годину); при успіху boil_last_ok.
+// Автовмикання бойлерів (Tuya) за командою бази (outage_pwr_tick). v3 (07.11.2026): один підсумок замість «✅» по кожній розетці. v4 (08.11.2026): «вже ввімкнені» не надсилаємо; при короткому збої (body.note) пишемо лише якщо щось реально ввімкнули. v6 (10.11.2026): розетки з outage_st boil_skip пропускаються. v5 (09.11.2026): помилки розеток не надсилаємо, а пишемо в стан boil_fail (базa сама попередить через годину); при успіху boil_last_ok.
 // Захист: заголовок X-Telegram-Bot-Api-Secret-Token має збігатися з tg_settings.secret.
 // Логіка Tuya скопійована з telegram-bot (runBoilers), бюджетний бот не змінюється.
 // Якщо жодна розетка не ввімкнулась через offline, цикл не вважається обробленим (boil_cycle = '', пауза 10 хв).
@@ -63,7 +63,10 @@ async function run(token: string, silent: boolean, note: string) {
       await say("⚠️ Автовмикання: Tuya ще не налаштовано (таблиця tuya_settings).");
       return;
     }
-    const names = (c.names ?? []).filter((n) => n && n.trim());
+    // v6 (10.11.2026): розетки зі стану boil_skip (імена через кому) автоматично не вмикаємо
+    const { data: skipRaw } = await sb.rpc("outage_st_get", { k: "boil_skip" });
+    const skip = String(skipRaw ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+    const names = (c.names ?? []).filter((n) => n && n.trim() && !skip.includes(n.trim().toLowerCase()));
     const gap = Math.max(0, Math.min(90, Number(c.gap_seconds ?? 60)));
     const tk = (await tuyaCall(c, "GET", "/v1.0/token?grant_type=1")).access_token as string;
     const devs = (await tuyaCall(c, "GET", `/v1.0/users/${encodeURIComponent(c.uid)}/devices`, undefined, tk)) as TuyaDevice[];
